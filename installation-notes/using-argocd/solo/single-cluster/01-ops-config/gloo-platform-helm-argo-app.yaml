@@ -22,6 +22,8 @@ spec:
           glooGatewayLicenseKey: "REDACTED"
         common:
           cluster: mgmt
+        featureGates:
+          istioLifecycleAgent: true
         glooMgmtServer:
           enabled: true
           agents:
@@ -33,6 +35,7 @@ spec:
             serverAddress: gloo-mesh-mgmt-server:9900
         prometheus:
           enabled: true
+          skipAutoMigration: true
         redis:
           deployment:
             enabled: true
@@ -49,7 +52,7 @@ spec:
               otlp:
                 endpoint: gloo-telemetry-gateway.gloo-mesh:4317
     repoURL: https://storage.googleapis.com/gloo-platform/helm-charts
-    targetRevision: 2.6.0
+    targetRevision: 2.6.1
   syncPolicy:
     automated:
       prune: true
