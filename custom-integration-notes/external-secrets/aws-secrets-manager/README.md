@@ -238,7 +238,7 @@ helm upgrade -i gloo-platform-crds gloo-platform/gloo-platform-crds \
   --namespace=gloo-mesh --wait
 ```
 
-Install the Gloo Mesh Enterprise components with the licensing.licenseSecretName value overridden with the Kubernetes Secret name:
+Install the Gloo Mesh Enterprise components with the `licensing.licenseSecretName` value overridden with the Kubernetes Secret name:
 
 ```yaml
 licensing:
