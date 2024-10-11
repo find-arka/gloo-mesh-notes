@@ -6,9 +6,15 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-8"
 spec:
+  # helmGlobal:
+  #   # If present, the Gloo agent uses the credentials in the given secrets to log in to the OCI registry to access Istio charts. Similar to ImagePullSecrets, the secrets that you specify in this section must be of type kubernetes.io/dockerconfigjson and must exist on all the clusters where you want the Gloo agent to install Istio.
+  #   repoSecrets: []
   installations:
       # The revision for this installation, such as 1-22
     - revision: 1-22
+      # Names of image pull secrets to use to deploy the Istio controller.
+      #istioController:
+      #  imagePullSecrets: []
       # List all workload clusters to install Istio into
       clusters:
       - name: mgmt

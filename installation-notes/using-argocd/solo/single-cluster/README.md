@@ -59,6 +59,28 @@ kubectl --context "${CLUSTER_NAME}" -n argocd patch secret argocd-secret -p '{"s
 }}'
 ```
 
+### pre-req license creation
+
+We are manually creating the K8s Secret with the Gloo Mesh license keys here. This can be done in different ways. One of the alternate ways is to [use external-secrets operator to pre-create the license Secret](https://github.com/find-arka/gloo-mesh-notes/blob/main/custom-integration-notes/external-secrets/aws-secrets-manager/README.md).
+
+```bash
+kubectl create namespace gloo-mesh
+```
+
+```bash
+kubectl apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: gloo-mesh-enterprise-license-keys
+  namespace: gloo-mesh
+stringData:
+  gloo-mesh-license-key: "${GLOO_MESH_LICENSE_KEY}"
+  gloo-gateway-license-key: "${GLOO_GATEWAY_LICENSE_KEY}"
+EOF
+```
+
 ### Create the ArgoCD applications
 
 #### Gloo Mesh Enterprise
