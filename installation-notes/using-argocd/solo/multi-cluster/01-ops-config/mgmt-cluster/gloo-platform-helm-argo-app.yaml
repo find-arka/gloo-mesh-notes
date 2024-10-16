@@ -1,0 +1,95 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gloo-platform-helm
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: gloo-mesh
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: gloo-platform
+    helm:
+      skipCrds: true
+      values: |
+        licensing:
+          licenseSecretName: gloo-mesh-enterprise-license-keys
+        common:
+          cluster: mgmt
+        glooMgmtServer:
+          enabled: true
+          agents:
+            - name: mgmt
+          # Notice for multi-cluster we need a LB type reachable from the workload cluster
+          serviceType: LoadBalancer
+          image:
+            registry: gcr.io/gloo-mesh
+            repository: gloo-mesh-mgmt-server
+          # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
+          #imagePullSecrets: []
+        prometheus:
+          enabled: true
+          skipAutoMigration: true
+          #imagePullSecrets: []
+          # - name: "image-pull-secret"
+          configmapReload:
+            prometheus:
+              image:
+                repository: quay.io/prometheus-operator/prometheus-config-reloader
+          server:
+            image:
+              repository: quay.io/prometheus/prometheus
+        redis:
+          deployment:
+            enabled: true
+            image:
+              registry: gcr.io/gloo-mesh
+              repository: redis
+            #imagePullSecrets: []
+        glooUi:
+          enabled: true
+          image:
+            registry: gcr.io/gloo-mesh
+            repository: gloo-mesh-apiserver
+          # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
+          #imagePullSecrets: []
+          sidecars:
+            console:
+              image:
+                registry: gcr.io/gloo-mesh
+                repository: gloo-mesh-ui
+            envoy:
+              image:
+                registry: gcr.io/gloo-mesh
+                repository: gloo-mesh-envoy
+        telemetryGateway:
+          enabled: true
+          # Notice how also the telemetry gateway needs a load balancer type of service reachable from the workload cluster
+          service:
+            type: LoadBalancer
+          image:
+            repository: gcr.io/gloo-mesh/gloo-otel-collector
+          #imagePullSecrets: []
+        telemetryCollector:
+          enabled: true
+          config:
+            exporters:
+              otlp:
+                endpoint: gloo-telemetry-gateway.gloo-mesh:4317
+          image:
+            # TODO: double check if this value is default
+            repository: gcr.io/gloo-mesh/gloo-otel-collector
+          #imagePullSecrets: []
+    repoURL: https://storage.googleapis.com/gloo-platform/helm-charts
+    targetRevision: 2.6.5
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
