@@ -105,9 +105,9 @@ kubectl --context "${CLUSTER_NAME}" -n argocd patch secret argocd-secret -p '{"s
 }}'
 ```
 
-### pre-req license creation
+### pre-req license creation and secrets for relay
 
-We are manually creating the K8s Secret with the Gloo Mesh license keys here. This can be done in different ways. One of the alternate ways is to [use external-secrets operator to pre-create the license Secret](https://github.com/find-arka/gloo-mesh-notes/blob/main/custom-integration-notes/external-secrets/aws-secrets-manager/README.md).
+- We are manually creating the K8s Secret with the Gloo Mesh license keys here. This can be done in different ways. One of the alternate ways is to [use external-secrets operator to pre-create the license Secret](https://github.com/find-arka/gloo-mesh-notes/blob/main/custom-integration-notes/external-secrets/aws-secrets-manager/README.md).
 
 ```bash
 kubectl create namespace gloo-mesh
@@ -125,6 +125,96 @@ stringData:
   gloo-mesh-license-key: "${GLOO_MESH_LICENSE_KEY}"
   gloo-gateway-license-key: "${GLOO_GATEWAY_LICENSE_KEY}"
 EOF
+```
+
+- Create relay secrets for mTLS in between agents and MP server. To create our root-ca cert we are going to use the tool/cert from istio repository:
+
+```bash
+git clone https://github.com/istio/istio.git --depth 1
+pushd istio/tools/certs
+```
+
+IMPORTANT: We are using istio tools and selfsigned certs just for the purpose to enable end to end encription between out components, for production usage proper certificated that depict the desired trust domain for the clusters should be used.
+
+- Create the root cert:
+
+```bash
+# ROOTCA_ORG is a variable than can be changed use whatever you want
+make -f Makefile.selfsigned.mk ROOTCA_ORG=my-org root-ca
+```
+
+- Create the relay intermediate CA for gloo:
+
+```bash
+# Here you need to use a different INTEMEDIATE_SAN_DNS from the variable in the makefile
+make -f Makefile.selfsigned.mk INTERMEDIATE_ORG=solo INTERMEDIATE_SAN_DNS=gloo-mesh-mgmt-server.gloo-mesh gloo-relay-cacerts
+```
+
+Note that for the intermediate SAN, we use `gloo-mesh-mgmt-server.gloo-mesh` or can be a wild card `*.gloo-mesh` which is the mgmt server expects for connecting using mTLS otherwise the connection will be rejected with the following error:
+
+```json
+{"level":"info","ts":"2024-04-09T18:17:09.171Z","caller":"grpclog/component.go:36","msg":"[core][Channel #5 SubChannel #6] Subchannel Connectivity change to IDLE, last error: connection error: desc = \"transport: authentication handshake failed: tls: failed to verify certificate: x509: certificate is valid for istiod.istio-system.svc, not gloo-mesh-mgmt-server.gloo-mesh\"","system":"grpc","grpc_log":true}
+```
+
+- Create a leaf relay-server-tls cert with the intermediate CA certificate
+Unfortunately, the make file cannot sign a certificate with our intermediate certificate, so we need to do it manually.
+
+> [!NOTE] Due to the server limitations, the mgmt plane cannot create the `relay-server-tls-secret` as opposed for the client which can be handled and managed by Gloo.
+
+Run the following go script to generate a certificate with out signing cacerts.
+
+```bash
+go run ../../security/tools/generate_cert/main.go --host="*.gloo-mesh" --signer-cert=gloo-relay/ca-cert.pem --signer-priv=gloo-relay/ca-key.pem --server=true --san="*.gloo-mesh" --mode=signer --out-cert="relay-server-cert.pem" --out-priv="relay-server-key.pem"
+```
+
+## Create the certificates in the mgmt cluster and workload clusters
+
+Now we are going to create the secrets beforehand and install the gloo mgmt plane.
+
+IMPORTANT: These secrets could be orchestrated to be created using any prefered external secret manager, but they will have to exist before the releases are installed.
+
+```sh
+export MGMT=mgmt
+export CLUSTER1=cluster1
+```
+
+```bash
+kubectl create namespace gloo-mesh --context ${MGMT}
+
+kubectl create secret generic relay-root-tls-secret \
+  --from-file=tls.key=gloo-relay/ca-key.pem \
+  --from-file=tls.crt=gloo-relay/ca-cert.pem \
+  --from-file=ca.crt=gloo-relay/cert-chain.pem \
+  --context ${MGMT} \
+  --namespace gloo-mesh
+
+kubectl create secret generic relay-tls-signing-secret \
+  --from-file=tls.key=gloo-relay/ca-key.pem \
+  --from-file=tls.crt=gloo-relay/ca-cert.pem \
+  --from-file=ca.crt=gloo-relay/cert-chain.pem \
+  --context ${MGMT} \
+  --namespace gloo-mesh
+
+kubectl create secret generic relay-server-tls-secret \
+  --from-file=tls.key=relay-server-key.pem \
+  --from-file=tls.crt=relay-server-cert.pem \
+  --from-file=ca.crt=gloo-relay/cert-chain.pem \
+  --context ${MGMT} \
+  --namespace gloo-mesh
+```
+
+Let's do the same in the workload cluster:
+
+```bash
+kubectl create namespace gloo-mesh --context ${CLUSTER1}
+
+kubectl create secret generic relay-root-tls-secret \
+  --from-file=tls.key=gloo-relay/ca-key.pem \
+  --from-file=tls.crt=gloo-relay/ca-cert.pem \
+  --from-file=ca.crt=gloo-relay/cert-chain.pem \
+  --context ${CLUSTER1} \
+  --namespace gloo-mesh
+  popd
 ```
 
 ### Create the ArgoCD applications
@@ -157,6 +247,30 @@ envsubst < 01-ops-config/workload-cluster/gloo-agent-helm-argo-app.yaml | k --co
 ```
 
 #### Istiod and Istio Ingress Gateway install
+
+- Create the root trust policy on the MP to generate trust in between cluster data planes
+
+IMPORTANT: This is assuming we accept the out of the box trust domain for the data plane.
+
+```sh
+kubectl apply --context ${MGMT} -f- << EOF
+apiVersion: admin.gloo.solo.io/v2
+kind: RootTrustPolicy
+metadata:
+  name: root-trust-policy
+  namespace: gloo-mesh
+spec:
+  config:
+    autoRestartPods: true
+    intermediateCertOptions:
+      secretRotationGracePeriodRatio: 0.1
+      ttlDays: 1
+    mgmtServerCa:
+      generated:
+        ttlDays: 730
+EOF
+```
+
 ```bash
-kubectl apply -f 02-admin-config
+kubectl apply -f 02-admin-config --context "${CLUSTER_1}"
 ```

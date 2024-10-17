@@ -24,12 +24,39 @@ spec:
         glooMgmtServer:
           enabled: true
           agents:
-            - name: mgmt
+            # List of names for the workload clusters:
+            - name: cluster-1
           # Notice for multi-cluster we need a LB type reachable from the workload cluster
           serviceType: LoadBalancer
+          # TODO: check if these values are default
           image:
             registry: gcr.io/gloo-mesh
             repository: gloo-mesh-mgmt-server
+          relay:
+            disableCa: false
+            # Do not auto-generate self-signed CA certificates. Set to true only when you supply own.
+            disableCaCertGeneration: true
+            # do not create token secret
+            disableTokenGeneration: true
+            # Push RBAC resources to the management server. Required for multicluster RBAC in the Gloo UI.
+            pushRbac: true
+            # Secret containing TLS certs used to sign CSRs created by workload agents.
+            signingTlsSecret:
+                name: relay-tls-signing-secret
+            tlsSecret:
+                name: relay-server-tls-secret
+            # Secret containing a shared token for authenticating Gloo agents when they first communicate with the management server.
+            tokenSecret:
+              # Key value of the data within the Kubernetes secret.
+              key: token
+              # Name of the Kubernetes secret.
+              name: relay-identity-token-secret
+              # Namespace of the Kubernetes secret.
+              namespace: ""
+          extraEnvs:
+            RELAY_TOKEN:
+              # any value but must match with the agent config value
+              value: wK77Itxr6p1BSNWmetRl3lTMw
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
           #imagePullSecrets: []
         prometheus:
@@ -47,12 +74,14 @@ spec:
         redis:
           deployment:
             enabled: true
+            # TODO: check if these values are default
             image:
               registry: gcr.io/gloo-mesh
               repository: redis
             #imagePullSecrets: []
         glooUi:
           enabled: true
+          # TODO: check if these values are default
           image:
             registry: gcr.io/gloo-mesh
             repository: gloo-mesh-apiserver
@@ -60,10 +89,12 @@ spec:
           #imagePullSecrets: []
           sidecars:
             console:
+              # TODO: check if these values are default
               image:
                 registry: gcr.io/gloo-mesh
                 repository: gloo-mesh-ui
             envoy:
+              # TODO: check if these values are default
               image:
                 registry: gcr.io/gloo-mesh
                 repository: gloo-mesh-envoy
@@ -72,6 +103,7 @@ spec:
           # Notice how also the telemetry gateway needs a load balancer type of service reachable from the workload cluster
           service:
             type: LoadBalancer
+          # TODO: check if these values are default
           image:
             repository: gcr.io/gloo-mesh/gloo-otel-collector
           #imagePullSecrets: []
