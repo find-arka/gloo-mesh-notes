@@ -167,6 +167,10 @@ Run the following go script to generate a certificate with out signing cacerts.
 go run ../../security/tools/generate_cert/main.go --host="*.gloo-mesh" --signer-cert=gloo-relay/ca-cert.pem --signer-priv=gloo-relay/ca-key.pem --server=true --san="*.gloo-mesh" --mode=signer --out-cert="relay-server-cert.pem" --out-priv="relay-server-key.pem"
 ```
 
+```bash
+go run ../../security/tools/generate_cert/main.go --host="gloo-telemetry-gateway.gloo-mesh" --signer-cert=gloo-relay/ca-cert.pem --signer-priv=gloo-relay/ca-key.pem --server=true --san="gloo-telemetry-gateway.gloo-mesh" --mode=signer --out-cert="gloo-telemetry-gateway-cert.pem" --out-priv="gloo-telemetry-gateway-key.pem"
+```
+
 ## Create the certificates in the mgmt cluster and workload clusters
 
 Now we are going to create the secrets beforehand and install the gloo mgmt plane.
@@ -198,6 +202,13 @@ kubectl create secret generic relay-tls-signing-secret \
 kubectl create secret generic relay-server-tls-secret \
   --from-file=tls.key=relay-server-key.pem \
   --from-file=tls.crt=relay-server-cert.pem \
+  --from-file=ca.crt=gloo-relay/cert-chain.pem \
+  --context ${MGMT} \
+  --namespace gloo-mesh
+
+kubectl create secret generic gloo-telemetry-gateway-tls-secret \
+  --from-file=tls.key=gloo-telemetry-gateway-key.pem \
+  --from-file=tls.crt=gloo-telemetry-gateway-cert.pem \
   --from-file=ca.crt=gloo-relay/cert-chain.pem \
   --context ${MGMT} \
   --namespace gloo-mesh

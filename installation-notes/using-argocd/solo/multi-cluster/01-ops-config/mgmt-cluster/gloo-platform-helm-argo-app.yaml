@@ -23,40 +23,45 @@ spec:
           cluster: mgmt
         glooMgmtServer:
           enabled: true
-          agents:
-            # List of names for the workload clusters:
-            - name: cluster-1
+          # Will be manually creating the Kubernetes cluster object to reduce dependency on helm upgrades every time a new workload cluster is added
+          # agents:
+          #   # List of names for the workload clusters:
+          #   - name: cluster-1
           # Notice for multi-cluster we need a LB type reachable from the workload cluster
           serviceType: LoadBalancer
+          serviceOverrides:
+            metadata:
+              annotations:
+                ##
+                # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.9/guide/service/annotations/#lb-type
+                # provisioning NLB
+                ##
+                service.beta.kubernetes.io/aws-load-balancer-type: "external"
+                ##
+                # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.9/guide/service/annotations/#nlb-target-type
+                # "ip" mode will route traffic directly to the pod IP.
+                # In this mode, AWS NLB sends traffic directly to the Kubernetes pods behind the service,
+                # eliminating the need for an extra network hop through the worker nodes in the Kubernetes cluster.
+                ##
+                service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+                ##
+                # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.9/guide/service/annotations/#lb-scheme
+                # svc needs to be accessible cross cluster
+                ##
+                service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
           # TODO: check if these values are default
           image:
             registry: gcr.io/gloo-mesh
             repository: gloo-mesh-mgmt-server
           relay:
-            disableCa: false
+            # To disable relay CA functionality, set to true. Set to true only when you supply your custom client certs to the agents for relay mTLS. The gloo-mesh-mgmt-server pod will not require a token secret or the signing cert secret. The agent pod will not require the token secret, but will fail without a client cert.
+            disableCa: true
             # Do not auto-generate self-signed CA certificates. Set to true only when you supply own.
             disableCaCertGeneration: true
             # do not create token secret
             disableTokenGeneration: true
-            # Push RBAC resources to the management server. Required for multicluster RBAC in the Gloo UI.
-            pushRbac: true
-            # Secret containing TLS certs used to sign CSRs created by workload agents.
-            signingTlsSecret:
-                name: relay-tls-signing-secret
             tlsSecret:
                 name: relay-server-tls-secret
-            # Secret containing a shared token for authenticating Gloo agents when they first communicate with the management server.
-            tokenSecret:
-              # Key value of the data within the Kubernetes secret.
-              key: token
-              # Name of the Kubernetes secret.
-              name: relay-identity-token-secret
-              # Namespace of the Kubernetes secret.
-              namespace: ""
-          extraEnvs:
-            RELAY_TOKEN:
-              # any value but must match with the agent config value
-              value: wK77Itxr6p1BSNWmetRl3lTMw
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
           #imagePullSecrets: []
         prometheus:
@@ -103,10 +108,31 @@ spec:
           # Notice how also the telemetry gateway needs a load balancer type of service reachable from the workload cluster
           service:
             type: LoadBalancer
+            # https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml#L479
+            annotations:
+              ##
+              # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.9/guide/service/annotations/#lb-type
+              # provisioning NLB
+              ##
+              service.beta.kubernetes.io/aws-load-balancer-type: "external"
+              ##
+              # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.9/guide/service/annotations/#nlb-target-type
+              # "ip" mode will route traffic directly to the pod IP.
+              # In this mode, AWS NLB sends traffic directly to the Kubernetes pods behind the service,
+              # eliminating the need for an extra network hop through the worker nodes in the Kubernetes cluster.
+              ##
+              service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+              ##
+              # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.9/guide/service/annotations/#lb-scheme
+              # svc needs to be accessible cross cluster
+              ##
+              service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
           # TODO: check if these values are default
           image:
             repository: gcr.io/gloo-mesh/gloo-otel-collector
           #imagePullSecrets: []
+        telemetryGatewayCustomization:
+          disableCertGeneration: true
         telemetryCollector:
           enabled: true
           config:
