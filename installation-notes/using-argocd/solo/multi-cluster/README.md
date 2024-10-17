@@ -284,3 +284,9 @@ EOF
 ```bash
 kubectl apply -f 02-admin-config/gloo-platform-istiolifecyclemanager-argo-app.yaml --context ${MGMT}
 ```
+
+- Create the GatewayLifeCycle Manager instance for your workload cluster:
+
+```bash
+kubectl apply -f 02-admin-config/gloo-platform-gatewaylifecyclemanager-argo-app.yaml --context ${MGMT}
+```
