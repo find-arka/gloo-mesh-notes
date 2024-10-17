@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: https://github.com/find-arka/gloo-mesh-notes
     path: installation-notes/using-argocd/solo/single-cluster/02-admin-config/lifecyclemanager-config/istio-ingressgateway-config
-    targetRevision: HEAD
+    targetRevision: multi-cluster-argo
     directory:
       recurse: true
   destination:

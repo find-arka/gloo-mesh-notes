@@ -221,9 +221,17 @@ kubectl create secret generic relay-root-tls-secret \
 
 #### Gloo Mesh Enterprise
 
+- Install the ArgoCD Gloo Platform CRD App and Helm app:
+
 ```bash
 kubectl apply -f 01-ops-config/mgmt-cluster/gloo-platform-crds-argo-app.yaml --context "${MGMT}"
 kubectl apply -f 01-ops-config/mgmt-cluster/gloo-platform-helm-argo-app.yaml --context "${MGMT}"
+```
+
+- Install the ArgoCD Gloo CRDs app in the workload cluster:
+
+```bash
+kubectl apply -f 01-ops-config/mgmt-cluster/gloo-platform-crds-argo-app.yaml --context "${CLUSTER_1}"
 ```
 
 - Get the telemetry gateway and the management server addresses:
@@ -271,6 +279,8 @@ spec:
 EOF
 ```
 
+- Create IstioLifeCycle Manager instance for your workload clusters:
+
 ```bash
-kubectl apply -f 02-admin-config --context "${CLUSTER_1}"
+kubectl apply -f 02-admin-config/gloo-platform-istiolifecyclemanager-argo-app.yaml --context ${MGMT}
 ```

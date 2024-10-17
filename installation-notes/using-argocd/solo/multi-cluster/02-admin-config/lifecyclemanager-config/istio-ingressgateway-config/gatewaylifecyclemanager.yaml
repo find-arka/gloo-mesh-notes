@@ -14,7 +14,7 @@ spec:
     - gatewayRevision: 1-22
       # List all workload clusters to install Istio into
       clusters:
-      - name: clsuter-1
+      - name: cluster-1
         # If set to true, the spec for this revision is applied in the cluster
         activeGateway: true
       istioOperatorSpec:
