@@ -311,15 +311,34 @@ This setup secures the relay connection between the Gloo management server and a
 ### Create the token secrets
 
 ```bash
+kubectl --context "${MGMT}" create ns gloo-mesh
+kubectl --context "${CLUSTER_1}" create ns gloo-mesh
+```
+
+```bash
 kubectl --context "${MGMT}" apply -f -<< EOF
 apiVersion: v1
 kind: Secret
 type: Opaque
 metadata:
-  name: relay-identity-token-secret
+  name: gloo-mesh-enterprise-license-keys
   namespace: gloo-mesh
 stringData:
-  token: "my-secret-token"
+  gloo-mesh-license-key: "${GLOO_MESH_LICENSE_KEY}"
+  gloo-gateway-license-key: "${GLOO_GATEWAY_LICENSE_KEY}"
+EOF
+```
+
+```bash
+kubectl --context "${MGMT}" apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: relay-token
+  namespace: gloo-mesh
+stringData:
+  token: "my-lucky-secret-token"
 EOF
 ```
 
@@ -329,10 +348,10 @@ apiVersion: v1
 kind: Secret
 type: Opaque
 metadata:
-  name: relay-identity-token-secret
+  name: relay-token
   namespace: gloo-mesh
 stringData:
-  token: "my-secret-token"
+  token: "my-lucky-secret-token"
 EOF
 ```
 

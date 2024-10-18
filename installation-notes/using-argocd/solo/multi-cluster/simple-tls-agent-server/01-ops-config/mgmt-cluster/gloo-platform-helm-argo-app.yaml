@@ -30,7 +30,8 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: token
-                  name: relay-identity-token-secret
+                  name: relay-token
+                  optional: true
           serviceType: LoadBalancer
           serviceOverrides:
             metadata:
