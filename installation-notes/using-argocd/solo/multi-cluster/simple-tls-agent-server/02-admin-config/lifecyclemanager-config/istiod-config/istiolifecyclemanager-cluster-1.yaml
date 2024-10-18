@@ -1,7 +1,7 @@
 apiVersion: admin.gloo.solo.io/v2
 kind: IstioLifecycleManager
 metadata:
-  name: istiod-control-plane
+  name: istio-control-plane-cluster-1
   namespace: gloo-mesh
   annotations:
     argocd.argoproj.io/sync-wave: "-8"

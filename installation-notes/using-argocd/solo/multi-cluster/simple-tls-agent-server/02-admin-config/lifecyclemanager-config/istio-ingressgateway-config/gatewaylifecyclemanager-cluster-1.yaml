@@ -1,7 +1,7 @@
 apiVersion: admin.gloo.solo.io/v2
 kind: GatewayLifecycleManager
 metadata:
-  name: istio-ingressgateway
+  name: istio-ingressgateway-cluster-1
   namespace: gloo-mesh
   annotations:
     argocd.argoproj.io/sync-wave: "-7"
