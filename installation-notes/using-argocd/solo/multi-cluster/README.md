@@ -343,7 +343,7 @@ EOF
 - Install the ArgoCD Gloo Platform CRD App and Helm app:
 
 ```bash
-kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-crds-argo-app.yaml --context "${MGMT}"
+kubectl apply -f simple-tls-agent-server/01-ops-config/common/gloo-platform-crds-argo-app.yaml --context "${MGMT}"
 kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-helm-argo-app.yaml --context "${MGMT}"
 ```
 
@@ -391,7 +391,7 @@ kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platfor
 - Install the ArgoCD Gloo CRDs app in the workload cluster:
 
 ```bash
-kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-crds-argo-app.yaml --context "${CLUSTER_1}"
+kubectl apply -f simple-tls-agent-server/01-ops-config/common/gloo-platform-crds-argo-app.yaml --context "${CLUSTER_1}"
 ```
 
 - Get the telemetry gateway and the management server addresses:
