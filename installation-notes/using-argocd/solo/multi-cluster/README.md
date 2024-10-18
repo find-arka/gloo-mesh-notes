@@ -432,3 +432,40 @@ These are going to be used on the agent config:
 ```sh
 envsubst < simple-tls-agent-server/01-ops-config/workload-cluster/gloo-platform-agent-argo-app.yaml | kubectl --context "${CLUSTER_1}" apply -f -
 ```
+
+#### Istiod and Istio Ingress Gateway install
+
+- Create the root trust policy on the MP to generate trust in between cluster data planes
+
+IMPORTANT: This is assuming we accept the out of the box trust domain for the data plane.
+
+```sh
+kubectl apply --context ${MGMT} -f- << EOF
+apiVersion: admin.gloo.solo.io/v2
+kind: RootTrustPolicy
+metadata:
+  name: root-trust-policy
+  namespace: gloo-mesh
+spec:
+  config:
+    autoRestartPods: true
+    intermediateCertOptions:
+      secretRotationGracePeriodRatio: 0.1
+      ttlDays: 1
+    mgmtServerCa:
+      generated:
+        ttlDays: 730
+EOF
+```
+
+- Create IstioLifeCycle Manager instance for your workload clusters:
+
+```bash
+kubectl apply -f simple-tls-agent-server/02-admin-config/gloo-platform-istiolifecyclemanager-argo-app.yaml --context ${MGMT}
+```
+
+- Create the GatewayLifeCycle Manager instance for your workload cluster:
+
+```bash
+kubectl apply -f simple-tls-agent-server/02-admin-config/gloo-platform-gatewaylifecyclemanager-argo-app.yaml --context ${MGMT}
+```
