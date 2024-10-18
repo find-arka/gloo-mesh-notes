@@ -448,7 +448,6 @@ metadata:
   namespace: gloo-mesh
 spec:
   config:
-    autoRestartPods: true
     intermediateCertOptions:
       secretRotationGracePeriodRatio: 0.1
       ttlDays: 1
@@ -458,14 +457,8 @@ spec:
 EOF
 ```
 
-- Create IstioLifeCycle Manager instance for your workload clusters:
+- Create IstioLifecycleManager and GatewayLifecycleManager instances for your workload clusters:
 
 ```bash
-kubectl apply -f simple-tls-agent-server/02-admin-config/gloo-platform-istiolifecyclemanager-argo-app.yaml --context ${MGMT}
-```
-
-- Create the GatewayLifeCycle Manager instance for your workload cluster:
-
-```bash
-kubectl apply -f simple-tls-agent-server/02-admin-config/gloo-platform-gatewaylifecyclemanager-argo-app.yaml --context ${MGMT}
+kubectl apply -f simple-tls-agent-server/02-admin-config --context ${MGMT}
 ```
