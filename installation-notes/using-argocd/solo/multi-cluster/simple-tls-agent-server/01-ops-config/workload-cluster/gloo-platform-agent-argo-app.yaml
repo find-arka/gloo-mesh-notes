@@ -25,9 +25,6 @@ spec:
             # Because the glooAgent is running on a different cluster than the management server, the address needs to resolve to where the MP server is:
             # serverAddress: <<REPLACE-WITH-gloo-mesh-mgmt-server-ADDRESS>>:9900
             serverAddress: $GLOO_PLATFORM_SERVER_ADDRESS
-            # tokenSecret:
-            #   key: token
-            #   name: relay-identity-token-secret
           extraEnvs:
             RELAY_DISABLE_SERVER_CERTIFICATE_VALIDATION:
               value: "true"

@@ -26,6 +26,11 @@ spec:
           extraEnvs:
             RELAY_DISABLE_CLIENT_CERTIFICATE_AUTHENTICATION:
               value: "true"
+            RELAY_TOKEN:
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: relay-identity-token-secret
           serviceType: LoadBalancer
           serviceOverrides:
             metadata:
@@ -40,10 +45,6 @@ spec:
           image:
             registry: gcr.io/gloo-mesh
             repository: gloo-mesh-mgmt-server
-          relay:
-            tokenSecret:
-              key: token
-              name: relay-identity-token-secret
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
           #imagePullSecrets: []
         prometheus:
