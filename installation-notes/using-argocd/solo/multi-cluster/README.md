@@ -105,6 +105,8 @@ kubectl --context "${CLUSTER_NAME}" -n argocd patch secret argocd-secret -p '{"s
 }}'
 ```
 
+## mTLS agent-server relay setup
+
 ### pre-req license creation and secrets for relay
 
 - We are manually creating the K8s Secret with the Gloo Mesh license keys here. This can be done in different ways. One of the alternate ways is to [use external-secrets operator to pre-create the license Secret](https://github.com/find-arka/gloo-mesh-notes/blob/main/custom-integration-notes/external-secrets/aws-secrets-manager/README.md).
@@ -171,7 +173,7 @@ go run ../../security/tools/generate_cert/main.go --host="*.gloo-mesh" --signer-
 go run ../../security/tools/generate_cert/main.go --host="gloo-telemetry-gateway.gloo-mesh" --signer-cert=gloo-relay/ca-cert.pem --signer-priv=gloo-relay/ca-key.pem --server=true --san="gloo-telemetry-gateway.gloo-mesh" --mode=signer --out-cert="gloo-telemetry-gateway-cert.pem" --out-priv="gloo-telemetry-gateway-key.pem"
 ```
 
-## Create the certificates in the mgmt cluster and workload clusters
+### Create the certificates in the mgmt cluster and workload clusters
 
 Now we are going to create the secrets beforehand and install the gloo mgmt plane.
 
@@ -300,4 +302,114 @@ kubectl apply -f 02-admin-config/gloo-platform-istiolifecyclemanager-argo-app.ya
 
 ```bash
 kubectl apply -f 02-admin-config/gloo-platform-gatewaylifecyclemanager-argo-app.yaml --context ${MGMT}
+```
+
+## Simple TLS agent-server relay setup
+
+This setup secures the relay connection between the Gloo management server and agents by using simple TLS. In a simple TLS setup only the Gloo management server is configured with a server TLS certificate that is used to prove the server’s identity. The identity of the Gloo agent is not verified. To establish initial trust, relay tokens are used.
+
+### Create the token secrets
+
+```bash
+kubectl --context "${MGMT}" apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: relay-identity-token-secret
+  namespace: gloo-mesh
+stringData:
+  token: "my-secret-token"
+EOF
+```
+
+```bash
+kubectl --context "${CLUSTER_1}" apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: relay-identity-token-secret
+  namespace: gloo-mesh
+stringData:
+  token: "my-secret-token"
+EOF
+```
+
+### Create the ArgoCD applications
+
+#### Gloo Mesh Enterprise
+
+- Install the ArgoCD Gloo Platform CRD App and Helm app:
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-crds-argo-app.yaml --context "${MGMT}"
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-helm-argo-app.yaml --context "${MGMT}"
+```
+
+`meshctl check --kubecontext "${MGMT}"` output:
+
+```bash
+{"level":"info","ts":"2024-10-18T14:09:41.026-0400","caller":"client/client.go:283","msg":"VALID LICENSE: gloo-mesh Enterprise, issued at 2024-02-29 17:04:52 -0500 EST, expires at 2026-07-30 18:04:52 -0400 EDT"}
+{"level":"info","ts":"2024-10-18T14:09:41.027-0400","caller":"client/client.go:283","msg":"VALID LICENSE: gloo-gateway Enterprise, issued at 2024-02-29 17:06:21 -0500 EST, expires at 2026-07-30 18:06:21 -0400 EDT"}
+
+🟢 License status
+
+ INFO  gloo-mesh enterprise license expiration is 30 Jul 26 18:04 EDT
+ INFO  gloo-gateway enterprise license expiration is 30 Jul 26 18:06 EDT
+ INFO  No GraphQL license module found for any product
+
+🟢 CRD version check
+
+
+🟢 Gloo Platform deployment status
+
+Namespace | Name                           | Ready | Status
+gloo-mesh | gloo-mesh-mgmt-server          | 1/1   | Healthy
+gloo-mesh | gloo-mesh-redis                | 1/1   | Healthy
+gloo-mesh | gloo-mesh-ui                   | 1/1   | Healthy
+gloo-mesh | gloo-telemetry-gateway         | 1/1   | Healthy
+gloo-mesh | prometheus-server              | 1/1   | Healthy
+gloo-mesh | gloo-telemetry-collector-agent | 2/2   | Healthy
+
+🟡 Mgmt server connectivity to workload agents
+
+ INFO      * No registered clusters detected. To register a remote cluster that has a deployed Gloo Mesh agent, add a KubernetesCluster CR.
+ INFO        For more info, see: https://docs.solo.io/gloo-mesh-enterprise/main/setup/install/enterprise_installation/#helm-register
+
+Connected Pod | Clusters
+```
+
+#### Gloo Mesh workload cluster registration, installation
+
+- Create the `KubernetesCluster` objects using the gloo-platform-kubernetes-clusters-argo-app.yaml
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-kubernetes-clusters-argo-app.yaml --context "${MGMT}"
+```
+
+- Install the ArgoCD Gloo CRDs app in the workload cluster:
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-crds-argo-app.yaml --context "${CLUSTER_1}"
+```
+
+- Get the telemetry gateway and the management server addresses:
+
+```sh
+# wait for the load balancer to be provisioned
+until kubectl get service/gloo-mesh-mgmt-server --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
+until kubectl get service/gloo-telemetry-gateway --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
+export GLOO_PLATFORM_SERVER_DOMAIN=$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}')
+export GLOO_PLATFORM_SERVER_ADDRESS=${GLOO_PLATFORM_SERVER_DOMAIN}:$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="grpc")].port}')
+export GLOO_TELEMETRY_GATEWAY=$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}'):$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="otlp")].port}')
+
+echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
+echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
+```
+
+These are going to be used on the agent config:
+
+```sh
+envsubst < simple-tls-agent-server/01-ops-config/workload-cluster/gloo-agent-helm-argo-app.yaml | kubectl --context "${CLUSTER_1}" apply -f -
 ```

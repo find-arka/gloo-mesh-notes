@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gloo-agent-helm
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: gloo-mesh
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: gloo-platform
+    helm:
+      skipCrds: true
+      values: |
+        common:
+          cluster: $CLUSTER_1
+        glooAgent:
+          enabled: true
+          relay:
+            # SNI name in the authority/host header used to connect to relay forwarding server. Must match server certificate CommonName. Do not change the default value.
+            authority: "gloo-mesh-mgmt-server.gloo-mesh"
+            # Because the glooAgent is running on a different cluster than the management server, the address needs to resolve to where the MP server is:
+            # serverAddress: <<REPLACE-WITH-gloo-mesh-mgmt-server-ADDRESS>>:9900
+            serverAddress: $GLOO_PLATFORM_SERVER_ADDRESS
+            tokenSecret:
+              key: token
+              name: relay-identity-token-secret
+          extraEnvs:
+            RELAY_DISABLE_SERVER_CERTIFICATE_VALIDATION:
+              value: "true"
+          image:
+            # TODO: check if these values are by default to remove from here:
+            registry: gcr.io/gloo-mesh
+            repository: gloo-mesh-agent
+          # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
+          #imagePullSecrets: []
+        telemetryCollector:
+          enabled: true
+          config:
+            exporters:
+              otlp:
+                # Because the glooAgent is running on a different cluster than the management server, the address needs to resolve to where the MP server is:
+                # endpoint: <<REPLACE-WITH-gloo-telemetry-gateway-ADDRESS>>:4317
+                endpoint: $GLOO_TELEMETRY_GATEWAY
+          image:
+            # TODO: check if these values are by default to remove from here:
+            repository: gcr.io/gloo-mesh/gloo-otel-collector
+          #imagePullSecrets: []
+        telemetryCollectorCustomization:
+          skipVerify: true
+    repoURL: https://storage.googleapis.com/gloo-platform/helm-charts
+    targetRevision: 2.6.5
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
