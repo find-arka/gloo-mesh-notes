@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: gloo-agent-helm
+  name: gloo-platform-agent
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -22,17 +22,20 @@ spec:
         glooAgent:
           enabled: true
           relay:
-            # SNI name in the authority/host header used to connect to relay forwarding server. Must match server certificate CommonName. Do not change the default value.
-            authority: "gloo-mesh-mgmt-server.gloo-mesh"
             # Because the glooAgent is running on a different cluster than the management server, the address needs to resolve to where the MP server is:
             # serverAddress: <<REPLACE-WITH-gloo-mesh-mgmt-server-ADDRESS>>:9900
             serverAddress: $GLOO_PLATFORM_SERVER_ADDRESS
-            tokenSecret:
-              key: token
-              name: relay-identity-token-secret
+            # tokenSecret:
+            #   key: token
+            #   name: relay-identity-token-secret
           extraEnvs:
             RELAY_DISABLE_SERVER_CERTIFICATE_VALIDATION:
               value: "true"
+            RELAY_TOKEN:
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: relay-identity-token-secret
           image:
             # TODO: check if these values are by default to remove from here:
             registry: gcr.io/gloo-mesh

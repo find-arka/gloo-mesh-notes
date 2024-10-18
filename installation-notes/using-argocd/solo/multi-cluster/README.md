@@ -411,5 +411,5 @@ echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
 These are going to be used on the agent config:
 
 ```sh
-envsubst < simple-tls-agent-server/01-ops-config/workload-cluster/gloo-agent-helm-argo-app.yaml | kubectl --context "${CLUSTER_1}" apply -f -
+envsubst < simple-tls-agent-server/01-ops-config/workload-cluster/gloo-platform-agent-argo-app.yaml | kubectl --context "${CLUSTER_1}" apply -f -
 ```
