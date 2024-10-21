@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: gloo-platform-kubernetes-clusters
+  name: gloo-platform-administrative-custom-resources
   namespace: argocd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
