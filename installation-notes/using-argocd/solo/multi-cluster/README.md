@@ -282,7 +282,6 @@ metadata:
   namespace: gloo-mesh
 spec:
   config:
-    autoRestartPods: true
     intermediateCertOptions:
       secretRotationGracePeriodRatio: 0.1
       ttlDays: 1
@@ -355,18 +354,27 @@ stringData:
 EOF
 ```
 
-### Create the ArgoCD applications
+### Create the ArgoCD Applications
 
-#### Gloo Mesh Enterprise
+### Install Gloo Mesh Management server using ArgoCD Applications
 
-- Install the ArgoCD Gloo Platform CRD App and Helm app:
+Install CRDs
 
 ```bash
 kubectl apply -f simple-tls-agent-server/01-ops-config/common/gloo-platform-crds-argo-app.yaml --context "${MGMT}"
+```
+
+Install Management Server components
+
+```bash
 kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-helm-argo-app.yaml --context "${MGMT}"
 ```
 
-`meshctl check --kubecontext "${MGMT}"` output:
+#### Validation
+
+```bash
+meshctl check --kubecontext "${MGMT}"
+```
 
 ```bash
 {"level":"info","ts":"2024-10-18T14:09:41.026-0400","caller":"client/client.go:283","msg":"VALID LICENSE: gloo-mesh Enterprise, issued at 2024-02-29 17:04:52 -0500 EST, expires at 2026-07-30 18:04:52 -0400 EDT"}
@@ -399,65 +407,52 @@ gloo-mesh | gloo-telemetry-collector-agent | 2/2   | Healthy
 Connected Pod | Clusters
 ```
 
-#### Gloo Mesh workload cluster registration, installation
+### Gloo Mesh agent cluster registration, agent installation using ArgoCD Applications
 
-- Create the `KubernetesCluster` objects using the gloo-platform-kubernetes-clusters-argo-app.yaml
+#### Registration
+
+Create the `KubernetesCluster` object required for registration of an agent, using the `gloo-platform-administrative-crs-argo-app.yaml`
 
 ```bash
-kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-kubernetes-clusters-argo-app.yaml --context "${MGMT}"
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-administrative-crs-argo-app.yaml --context "${MGMT}"
 ```
 
-- Install the ArgoCD Gloo CRDs app in the workload cluster:
+> This ArgoCD application also creates the `RootTrustPolicy` resource which is required for multicluster istio service mesh setup and cross cluster service to service seamless communication. There are other alternate aproaches to managing Istio signing certificates such as using cert-manager and an external PKI, using istio-csr etc.
+
+#### Agent installation
+
+1. Install the Gloo CRDs app in the workload cluster:
 
 ```bash
 kubectl apply -f simple-tls-agent-server/01-ops-config/common/gloo-platform-crds-argo-app.yaml --context "${CLUSTER_1}"
 ```
 
-- Get the telemetry gateway and the management server addresses:
+2. Get the Gloo telemetry gateway and the management server addresses from the management cluster.
 
 ```sh
 # wait for the load balancer to be provisioned
 until kubectl get service/gloo-mesh-mgmt-server --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
 until kubectl get service/gloo-telemetry-gateway --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
+
+# Get the LB addresses
 export GLOO_PLATFORM_SERVER_DOMAIN=$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}')
 export GLOO_PLATFORM_SERVER_ADDRESS=${GLOO_PLATFORM_SERVER_DOMAIN}:$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="grpc")].port}')
 export GLOO_TELEMETRY_GATEWAY=$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}'):$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="otlp")].port}')
 
+# Print the values
 echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
 echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
 ```
 
-These are going to be used on the agent config:
+3. Install agent using the above env variables.
 
 ```sh
 envsubst < simple-tls-agent-server/01-ops-config/workload-cluster/gloo-platform-agent-argo-app.yaml | kubectl --context "${CLUSTER_1}" apply -f -
 ```
 
-#### Istiod and Istio Ingress Gateway install
+#### Istiod and Istio Ingress Gateway install using LifecycleManager
 
-- Create the root trust policy on the MP to generate trust in between cluster data planes
-
-IMPORTANT: This is assuming we accept the out of the box trust domain for the data plane.
-
-```sh
-kubectl apply --context ${MGMT} -f- << EOF
-apiVersion: admin.gloo.solo.io/v2
-kind: RootTrustPolicy
-metadata:
-  name: root-trust-policy
-  namespace: gloo-mesh
-spec:
-  config:
-    intermediateCertOptions:
-      secretRotationGracePeriodRatio: 0.1
-      ttlDays: 1
-    mgmtServerCa:
-      generated:
-        ttlDays: 730
-EOF
-```
-
-- Create IstioLifecycleManager and GatewayLifecycleManager instances for your workload clusters:
+Create IstioLifecycleManager and GatewayLifecycleManager instances for your workload clusters:
 
 ```bash
 kubectl apply -f simple-tls-agent-server/02-admin-config --context ${MGMT}

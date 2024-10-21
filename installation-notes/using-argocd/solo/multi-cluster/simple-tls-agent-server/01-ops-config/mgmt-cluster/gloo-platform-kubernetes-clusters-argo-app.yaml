@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/find-arka/gloo-mesh-notes
-    path: installation-notes/using-argocd/solo/multi-cluster/simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-crs/
+    path: installation-notes/using-argocd/solo/multi-cluster/simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-mesh-administrative-custom-resources/
     targetRevision: multi-cluster-argo-updates
     directory:
       recurse: true
