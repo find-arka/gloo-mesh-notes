@@ -217,6 +217,12 @@ kubectl create secret generic relay-root-tls-secret \
   popd
 ```
 
+- Create image pull secret needed for private registry:
+
+```sh
+kubectl -n gloo-mesh create secret docker-registry regcred --docker-server=ghcr.io --docker-username=nauticalmike --docker-password=<<REGISTRY-TOKEN>>
+```
+
 ### Create the ArgoCD applications
 
 #### Gloo Mesh Enterprise

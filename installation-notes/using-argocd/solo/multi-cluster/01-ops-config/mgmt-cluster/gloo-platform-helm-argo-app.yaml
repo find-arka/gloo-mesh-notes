@@ -30,7 +30,7 @@ spec:
           serviceType: LoadBalancer
           # TODO: check if these values are default
           image:
-            registry: gcr.io/gloo-mesh
+            registry: ghcr.io/nauticalmike/gloo-mesh
             repository: gloo-mesh-mgmt-server
           relay:
             disableCa: false
@@ -58,7 +58,8 @@ spec:
               # any value but must match with the agent config value
               value: wK77Itxr6p1BSNWmetRl3lTMw
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
-          #imagePullSecrets: []
+          imagePullSecrets:
+          - name: regcred
         prometheus:
           enabled: true
           skipAutoMigration: true
@@ -76,27 +77,29 @@ spec:
             enabled: true
             # TODO: check if these values are default
             image:
-              registry: gcr.io/gloo-mesh
+              registry: ghcr.io/nauticalmike/gloo-mesh
               repository: redis
-            #imagePullSecrets: []
+            imagePullSecrets:
+            - name: regcred
         glooUi:
           enabled: true
           # TODO: check if these values are default
           image:
-            registry: gcr.io/gloo-mesh
+            registry: ghcr.io/nauticalmike/gloo-mesh
             repository: gloo-mesh-apiserver
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
-          #imagePullSecrets: []
+          imagePullSecrets:
+          - name: regcred
           sidecars:
             console:
               # TODO: check if these values are default
               image:
-                registry: gcr.io/gloo-mesh
+                registry: ghcr.io/nauticalmike/gloo-mesh
                 repository: gloo-mesh-ui
             envoy:
               # TODO: check if these values are default
               image:
-                registry: gcr.io/gloo-mesh
+                registry: ghcr.io/nauticalmike/gloo-mesh
                 repository: gloo-mesh-envoy
         telemetryGateway:
           enabled: true
@@ -106,7 +109,8 @@ spec:
           # TODO: check if these values are default
           image:
             repository: gcr.io/gloo-mesh/gloo-otel-collector
-          #imagePullSecrets: []
+          imagePullSecrets:
+          - name: regcred
         telemetryCollector:
           enabled: true
           config:
@@ -116,7 +120,8 @@ spec:
           image:
             # TODO: double check if this value is default
             repository: gcr.io/gloo-mesh/gloo-otel-collector
-          #imagePullSecrets: []
+          imagePullSecrets:
+          - name: regcred
     repoURL: https://storage.googleapis.com/gloo-platform/helm-charts
     targetRevision: 2.6.5
   syncPolicy:
