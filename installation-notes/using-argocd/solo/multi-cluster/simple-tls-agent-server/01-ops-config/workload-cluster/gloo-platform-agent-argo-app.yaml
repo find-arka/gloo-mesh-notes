@@ -33,7 +33,6 @@ spec:
                 secretKeyRef:
                   key: token
                   name: relay-token
-                  optional: true
           image:
             # TODO: check if these values are by default to remove from here:
             registry: gcr.io/gloo-mesh

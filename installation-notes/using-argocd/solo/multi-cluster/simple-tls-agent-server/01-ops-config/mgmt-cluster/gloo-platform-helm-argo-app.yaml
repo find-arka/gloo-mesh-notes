@@ -31,7 +31,8 @@ spec:
                 secretKeyRef:
                   key: token
                   name: relay-token
-                  optional: true
+          relay:
+            disableTokenGeneration: true
           serviceType: LoadBalancer
           serviceOverrides:
             metadata:
