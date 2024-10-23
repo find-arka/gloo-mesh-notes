@@ -105,6 +105,8 @@ kubectl --context "${CLUSTER_NAME}" -n argocd patch secret argocd-secret -p '{"s
 }}'
 ```
 
+## mTLS agent-server relay setup
+
 ### pre-req license creation and secrets for relay
 
 - We are manually creating the K8s Secret with the Gloo Mesh license keys here. This can be done in different ways. One of the alternate ways is to [use external-secrets operator to pre-create the license Secret](https://github.com/find-arka/gloo-mesh-notes/blob/main/custom-integration-notes/external-secrets/aws-secrets-manager/README.md).
@@ -167,7 +169,11 @@ Run the following go script to generate a certificate with out signing cacerts.
 go run ../../security/tools/generate_cert/main.go --host="*.gloo-mesh" --signer-cert=gloo-relay/ca-cert.pem --signer-priv=gloo-relay/ca-key.pem --server=true --san="*.gloo-mesh" --mode=signer --out-cert="relay-server-cert.pem" --out-priv="relay-server-key.pem"
 ```
 
-## Create the certificates in the mgmt cluster and workload clusters
+```bash
+go run ../../security/tools/generate_cert/main.go --host="gloo-telemetry-gateway.gloo-mesh" --signer-cert=gloo-relay/ca-cert.pem --signer-priv=gloo-relay/ca-key.pem --server=true --san="gloo-telemetry-gateway.gloo-mesh" --mode=signer --out-cert="gloo-telemetry-gateway-cert.pem" --out-priv="gloo-telemetry-gateway-key.pem"
+```
+
+### Create the certificates in the mgmt cluster and workload clusters
 
 Now we are going to create the secrets beforehand and install the gloo mgmt plane.
 
@@ -198,6 +204,13 @@ kubectl create secret generic relay-tls-signing-secret \
 kubectl create secret generic relay-server-tls-secret \
   --from-file=tls.key=relay-server-key.pem \
   --from-file=tls.crt=relay-server-cert.pem \
+  --from-file=ca.crt=gloo-relay/cert-chain.pem \
+  --context ${MGMT} \
+  --namespace gloo-mesh
+
+kubectl create secret generic gloo-telemetry-gateway-tls-secret \
+  --from-file=tls.key=gloo-telemetry-gateway-key.pem \
+  --from-file=tls.crt=gloo-telemetry-gateway-cert.pem \
   --from-file=ca.crt=gloo-relay/cert-chain.pem \
   --context ${MGMT} \
   --namespace gloo-mesh
@@ -275,7 +288,6 @@ metadata:
   namespace: gloo-mesh
 spec:
   config:
-    autoRestartPods: true
     intermediateCertOptions:
       secretRotationGracePeriodRatio: 0.1
       ttlDays: 1
@@ -295,4 +307,159 @@ kubectl apply -f 02-admin-config/gloo-platform-istiolifecyclemanager-argo-app.ya
 
 ```bash
 kubectl apply -f 02-admin-config/gloo-platform-gatewaylifecyclemanager-argo-app.yaml --context ${MGMT}
+```
+
+## Simple TLS agent-server relay setup
+
+This setup secures the relay connection between the Gloo management server and agents by using simple TLS. In a simple TLS setup only the Gloo management server is configured with a server TLS certificate that is used to prove the server’s identity. The identity of the Gloo agent is not verified. To establish initial trust, relay tokens are used.
+
+### Create the token secrets
+
+```bash
+kubectl --context "${MGMT}" create ns gloo-mesh
+kubectl --context "${CLUSTER_1}" create ns gloo-mesh
+```
+
+```bash
+kubectl --context "${MGMT}" apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: gloo-mesh-enterprise-license-keys
+  namespace: gloo-mesh
+stringData:
+  gloo-mesh-license-key: "${GLOO_MESH_LICENSE_KEY}"
+  gloo-gateway-license-key: "${GLOO_GATEWAY_LICENSE_KEY}"
+EOF
+```
+
+```bash
+kubectl --context "${MGMT}" apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: relay-token
+  namespace: gloo-mesh
+stringData:
+  token: "my-lucky-secret-token"
+EOF
+```
+
+```bash
+kubectl --context "${CLUSTER_1}" apply -f -<< EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: relay-token
+  namespace: gloo-mesh
+stringData:
+  token: "my-lucky-secret-token"
+EOF
+```
+
+### Create the ArgoCD Applications
+
+### Install Gloo Mesh Management server using ArgoCD Applications
+
+Install CRDs
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/common/gloo-platform-crds-argo-app.yaml --context "${MGMT}"
+```
+
+Install Management Server components
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-helm-argo-app.yaml --context "${MGMT}"
+```
+
+#### Validation
+
+```bash
+meshctl check --kubecontext "${MGMT}"
+```
+
+```bash
+{"level":"info","ts":"2024-10-18T14:09:41.026-0400","caller":"client/client.go:283","msg":"VALID LICENSE: gloo-mesh Enterprise, issued at 2024-02-29 17:04:52 -0500 EST, expires at 2026-07-30 18:04:52 -0400 EDT"}
+{"level":"info","ts":"2024-10-18T14:09:41.027-0400","caller":"client/client.go:283","msg":"VALID LICENSE: gloo-gateway Enterprise, issued at 2024-02-29 17:06:21 -0500 EST, expires at 2026-07-30 18:06:21 -0400 EDT"}
+
+🟢 License status
+
+ INFO  gloo-mesh enterprise license expiration is 30 Jul 26 18:04 EDT
+ INFO  gloo-gateway enterprise license expiration is 30 Jul 26 18:06 EDT
+ INFO  No GraphQL license module found for any product
+
+🟢 CRD version check
+
+
+🟢 Gloo Platform deployment status
+
+Namespace | Name                           | Ready | Status
+gloo-mesh | gloo-mesh-mgmt-server          | 1/1   | Healthy
+gloo-mesh | gloo-mesh-redis                | 1/1   | Healthy
+gloo-mesh | gloo-mesh-ui                   | 1/1   | Healthy
+gloo-mesh | gloo-telemetry-gateway         | 1/1   | Healthy
+gloo-mesh | prometheus-server              | 1/1   | Healthy
+gloo-mesh | gloo-telemetry-collector-agent | 2/2   | Healthy
+
+🟡 Mgmt server connectivity to workload agents
+
+ INFO      * No registered clusters detected. To register a remote cluster that has a deployed Gloo Mesh agent, add a KubernetesCluster CR.
+ INFO        For more info, see: https://docs.solo.io/gloo-mesh-enterprise/main/setup/install/enterprise_installation/#helm-register
+
+Connected Pod | Clusters
+```
+
+### Gloo Mesh agent cluster registration, agent installation using ArgoCD Applications
+
+#### Registration
+
+Create the `KubernetesCluster` object required for registration of an agent, using the `gloo-platform-administrative-crs-argo-app.yaml`
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/mgmt-cluster/gloo-platform-administrative-crs-argo-app.yaml --context "${MGMT}"
+```
+
+> This ArgoCD application also creates the `RootTrustPolicy` resource which is required for multicluster istio service mesh setup and cross cluster service to service seamless communication. There are other alternate aproaches to managing Istio signing certificates such as using cert-manager and an external PKI, using istio-csr etc.
+
+#### Agent installation
+
+1. Install the Gloo CRDs app in the workload cluster:
+
+```bash
+kubectl apply -f simple-tls-agent-server/01-ops-config/common/gloo-platform-crds-argo-app.yaml --context "${CLUSTER_1}"
+```
+
+2. Get the Gloo telemetry gateway and the management server addresses from the management cluster.
+
+```sh
+# wait for the load balancer to be provisioned
+until kubectl get service/gloo-mesh-mgmt-server --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
+until kubectl get service/gloo-telemetry-gateway --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
+
+# Get the LB addresses
+export GLOO_PLATFORM_SERVER_DOMAIN=$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}')
+export GLOO_PLATFORM_SERVER_ADDRESS=${GLOO_PLATFORM_SERVER_DOMAIN}:$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="grpc")].port}')
+export GLOO_TELEMETRY_GATEWAY=$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}'):$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="otlp")].port}')
+
+# Print the values
+echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
+echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
+```
+
+3. Install agent using the above env variables.
+
+```sh
+envsubst < simple-tls-agent-server/01-ops-config/workload-cluster/gloo-platform-agent-argo-app.yaml | kubectl --context "${CLUSTER_1}" apply -f -
+```
+
+#### Istiod and Istio Ingress Gateway install using LifecycleManager
+
+Create IstioLifecycleManager and GatewayLifecycleManager instances for your workload clusters:
+
+```bash
+kubectl apply -f simple-tls-agent-server/02-admin-config --context ${MGMT}
 ```

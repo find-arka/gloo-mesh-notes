@@ -4,7 +4,7 @@ metadata:
   name: gloo-platform-helm
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "-2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -23,6 +23,16 @@ spec:
           cluster: mgmt
         glooMgmtServer:
           enabled: true
+          extraEnvs:
+            RELAY_DISABLE_CLIENT_CERTIFICATE_AUTHENTICATION:
+              value: "true"
+            RELAY_TOKEN:
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: relay-token
+          relay:
+            disableTokenGeneration: true
           serviceType: LoadBalancer
           serviceOverrides:
             metadata:
@@ -35,20 +45,10 @@ spec:
                 #service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
           # TODO: check if these values are default
           image:
-            registry: ghcr.io/nauticalmike/gloo-mesh
+            registry: gcr.io/gloo-mesh
             repository: gloo-mesh-mgmt-server
-          relay:
-            # To disable relay CA functionality, set to true. Set to true only when you supply your custom client certs to the agents for relay mTLS. The gloo-mesh-mgmt-server pod will not require a token secret or the signing cert secret. The agent pod will not require the token secret, but will fail without a client cert.
-            disableCa: true
-            # Do not auto-generate self-signed CA certificates. Set to true only when you supply own.
-            disableCaCertGeneration: true
-            # do not create token secret
-            disableTokenGeneration: true
-            tlsSecret:
-                name: relay-server-tls-secret
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
-          imagePullSecrets:
-          - name: regcred
+          #imagePullSecrets: []
         prometheus:
           enabled: true
           skipAutoMigration: true
@@ -66,29 +66,27 @@ spec:
             enabled: true
             # TODO: check if these values are default
             image:
-              registry: ghcr.io/nauticalmike/gloo-mesh
+              registry: gcr.io/gloo-mesh
               repository: redis
-            imagePullSecrets:
-            - name: regcred
+            #imagePullSecrets: []
         glooUi:
           enabled: true
           # TODO: check if these values are default
           image:
-            registry: ghcr.io/nauticalmike/gloo-mesh
+            registry: gcr.io/gloo-mesh
             repository: gloo-mesh-apiserver
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
-          imagePullSecrets:
-          - name: regcred
+          #imagePullSecrets: []
           sidecars:
             console:
               # TODO: check if these values are default
               image:
-                registry: ghcr.io/nauticalmike/gloo-mesh
+                registry: gcr.io/gloo-mesh
                 repository: gloo-mesh-ui
             envoy:
               # TODO: check if these values are default
               image:
-                registry: ghcr.io/nauticalmike/gloo-mesh
+                registry: gcr.io/gloo-mesh
                 repository: gloo-mesh-envoy
         telemetryGateway:
           enabled: true
@@ -106,10 +104,7 @@ spec:
           # TODO: check if these values are default
           image:
             repository: gcr.io/gloo-mesh/gloo-otel-collector
-          imagePullSecrets:
-          - name: regcred
-        telemetryGatewayCustomization:
-          disableCertGeneration: true
+          #imagePullSecrets: []
         telemetryCollector:
           enabled: true
           config:
@@ -119,8 +114,9 @@ spec:
           image:
             # TODO: double check if this value is default
             repository: gcr.io/gloo-mesh/gloo-otel-collector
-          imagePullSecrets:
-          - name: regcred
+          #imagePullSecrets: []
+        telemetryCollectorCustomization:
+          skipVerify: true
     repoURL: https://storage.googleapis.com/gloo-platform/helm-charts
     targetRevision: 2.6.5
   syncPolicy:
