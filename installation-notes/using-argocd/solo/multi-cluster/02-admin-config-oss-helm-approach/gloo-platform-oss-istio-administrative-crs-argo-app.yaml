@@ -1,0 +1,27 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gloo-platform-oss-istio-administrative-crs
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-gateways
+  project: default
+  source:
+    repoURL: https://github.com/find-arka/gloo-mesh-notes
+    path: installation-notes/using-argocd/solo/multi-cluster/02-admin-config-oss-helm-approach/common-istio-administrative-manifests
+    targetRevision: oss-istio-charts-update
+    directory:
+      recurse: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
