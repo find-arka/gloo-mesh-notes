@@ -26,6 +26,6 @@ spec:
     protocol: TCP
     targetPort: 8443
   selector:
-    app: istio-ingressgateway
+    app: istio-ingressgateway-1-20
     istio: ingressgateway
   type: LoadBalancer
