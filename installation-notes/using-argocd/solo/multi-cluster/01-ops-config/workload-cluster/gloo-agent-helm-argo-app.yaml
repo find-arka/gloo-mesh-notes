@@ -33,10 +33,11 @@ spec:
               value:  wK77Itxr6p1BSNWmetRl3lTMw
           image:
             # TODO: check if these values are by default to remove from here:
-            registry: gcr.io/gloo-mesh
+            registry: ghcr.io/nauticalmike/gloo-mesh
             repository: gloo-mesh-agent
           # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container image registry. The image registry stores the container image that you want to use for this component.
-          #imagePullSecrets: []
+          imagePullSecrets:
+          - name: regcred
         telemetryCollector:
           enabled: true
           config:
@@ -47,8 +48,9 @@ spec:
                 endpoint: $GLOO_TELEMETRY_GATEWAY
           image:
             # TODO: check if these values are by default to remove from here:
-            repository: gcr.io/gloo-mesh/gloo-otel-collector
-          #imagePullSecrets: []
+            repository: ghcr.io/nauticalmike/gloo-mesh/gloo-otel-collector
+          imagePullSecrets:
+          - name: regcred
         telemetryCollectorCustomization:
           skipVerify: true
     repoURL: https://storage.googleapis.com/gloo-platform/helm-charts
