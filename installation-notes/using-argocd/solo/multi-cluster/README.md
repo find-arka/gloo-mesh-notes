@@ -457,3 +457,9 @@ Create IstioLifecycleManager and GatewayLifecycleManager instances for your work
 ```bash
 kubectl apply -f simple-tls-agent-server/02-admin-config --context ${MGMT}
 ```
+
+#### Istiod and Istio Ingress Gateway install using OSS helm value overrides
+
+```bash
+kubectl apply -f  02-admin-config-oss-helm-approach/ --context "${CLUSTER_1}"
+```
