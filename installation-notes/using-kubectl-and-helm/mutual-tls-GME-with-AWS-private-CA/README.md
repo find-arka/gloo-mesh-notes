@@ -1,4 +1,6 @@
-# mTLS relay setup
+# mTLS relay setup with bring your own CA and TLS certs
+
+[Setup summary](https://docs.solo.io/gloo-mesh-enterprise/latest/setup/prod/certs/relay/setup-options/#manual-certs)
 
 ## Cluster setup
 
@@ -318,7 +320,7 @@ spec:
 # ---------------- Certificate details ---------------------------------
   duration: 8760h # 365 days
   renewBefore: 360h # 15 days
-  commonName: gloo-mesh-mgmt-server
+  commonName: gloo-mesh-mgmt-server.gloo-mesh
   dnsNames:
     - "gloo-mesh-mgmt-server.gloo-mesh"
   usages:
@@ -365,7 +367,7 @@ spec:
 # ---------------- Certificate details ---------------------------------
   duration: 8760h # 365 days
   renewBefore: 360h # 15 days
-  commonName: gloo-telemetry-gateway
+  commonName: gloo-telemetry-gateway.gloo-mesh
   dnsNames:
     - "gloo-telemetry-gateway.gloo-mesh"
   usages:
@@ -412,7 +414,7 @@ spec:
 # ---------------- Certificate details ---------------------------------
   duration: 8760h # 365 days
   renewBefore: 360h # 15 days
-  commonName: gloo-mesh-agent
+  commonName: gloo-mesh-agent.gloo-mesh
   dnsNames:
     - "gloo-mesh-agent.gloo-mesh"
   usages:
@@ -625,14 +627,13 @@ echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
 echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
 ```
 
-### 
+### Create Root cert secret
 
 ```bash
 RELAY_ROOT_TLS_SECRET_CA_CERT=$(kubectl --context ${WORKLOAD_CLUSTER_1} -n gloo-mesh get secret gloo-mesh-agent-tls-secret -o yaml | yq '.data."ca.crt"' | base64 -d)
 echo "${RELAY_ROOT_TLS_SECRET_CA_CERT}"
 kubectl --context ${WORKLOAD_CLUSTER_1} -n gloo-mesh create secret generic relay-root-tls-secret --from-literal="ca.crt"="${RELAY_ROOT_TLS_SECRET_CA_CERT}"
 ```
-
 
 ### Install Gloo Mesh agent and telemetry components in workload cluster
 
@@ -653,21 +654,15 @@ glooAgent:
     # serverAddress: <<REPLACE-WITH-gloo-mesh-mgmt-server-ADDRESS>>:9900
     serverAddress: $GLOO_PLATFORM_SERVER_ADDRESS
     # SNI name in the authority/host header used to connect to relay forwarding server. Must match server certificate CommonName.
-    authority: "gloo-mesh-mgmt-server"
-    # Secret containing a shared token for authenticating Gloo agents when they first communicate with the management server. A token secret is not needed with ACM certs.
-    tokenSecret:
-      # Key value of the data within the Kubernetes secret.
-      key: null
-      # Name of the Kubernetes secret.
-      name: null
-      # Namespace of the Kubernetes secret.
-      namespace: null
+    authority: "gloo-mesh-mgmt-server.gloo-mesh"
   image:
     # TODO: check if these values are by default to remove from here:
     registry: gcr.io/gloo-mesh
     repository: gloo-mesh-agent
   # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container imagregistry. The image registry stores the container image that you want to use for this component.
   #imagePullSecrets: []
+  # enable verbose logging for the agent
+  verbose: true
 telemetryCollector:
   enabled: true
   config:
