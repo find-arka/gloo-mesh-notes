@@ -684,3 +684,34 @@ EOF
 ```bash
 meshctl check ${MGMT_CLUSTER}
 ```
+
+Expected output
+
+```bash
+🟢 License status
+
+ INFO  gloo-mesh enterprise license expiration is 30 Jul 26 18:04 EDT
+ INFO  gloo-gateway enterprise license expiration is 30 Jul 26 18:06 EDT
+ INFO  No GraphQL license module found for any product
+
+🟢 CRD version check
+
+
+🟢 Gloo Platform deployment status
+
+Namespace | Name                           | Ready | Status
+gloo-mesh | gloo-mesh-mgmt-server          | 1/1   | Healthy
+gloo-mesh | gloo-mesh-redis                | 1/1   | Healthy
+gloo-mesh | gloo-mesh-ui                   | 1/1   | Healthy
+gloo-mesh | gloo-telemetry-gateway         | 1/1   | Healthy
+gloo-mesh | prometheus-server              | 1/1   | Healthy
+gloo-mesh | gloo-telemetry-collector-agent | 2/2   | Healthy
+
+🟢 Mgmt server connectivity to workload agents
+
+Cluster                      | Registered | Connected Pod
+gloo-mesh-workload-cluster-1 | true       | gloo-mesh/gloo-mesh-mgmt-server-7fc94f5578-wnmfv
+
+Connected Pod                                    | Clusters
+gloo-mesh/gloo-mesh-mgmt-server-7fc94f5578-wnmfv | 1
+```
