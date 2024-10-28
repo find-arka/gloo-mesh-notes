@@ -414,9 +414,9 @@ spec:
 # ---------------- Certificate details ---------------------------------
   duration: 8760h # 365 days
   renewBefore: 360h # 15 days
-  commonName: gloo-mesh-agent.gloo-mesh
+  commonName: "${WORKLOAD_CLUSTER_1}"
   dnsNames:
-    - "gloo-mesh-agent.gloo-mesh"
+    - "${WORKLOAD_CLUSTER_1}"
   usages:
     - server auth
     - client auth
@@ -647,14 +647,14 @@ common:
   cluster: $WORKLOAD_CLUSTER_1
 glooAgent:
   enabled: true
-  clientTlsSecret:
-    name: gloo-mesh-agent-tls-secret
   relay:
     # Because the glooAgent is running on a different cluster than the management server, the address needs to resolve to where the Mserver is:
     # serverAddress: <<REPLACE-WITH-gloo-mesh-mgmt-server-ADDRESS>>:9900
     serverAddress: $GLOO_PLATFORM_SERVER_ADDRESS
     # SNI name in the authority/host header used to connect to relay forwarding server. Must match server certificate CommonName.
     authority: "gloo-mesh-mgmt-server.gloo-mesh"
+    clientTlsSecret:
+      name: gloo-mesh-agent-tls-secret
   image:
     # TODO: check if these values are by default to remove from here:
     registry: gcr.io/gloo-mesh
