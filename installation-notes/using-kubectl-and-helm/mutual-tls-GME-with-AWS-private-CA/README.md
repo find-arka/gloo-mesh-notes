@@ -416,6 +416,7 @@ spec:
   renewBefore: 360h # 15 days
   commonName: "${WORKLOAD_CLUSTER_1}"
   dnsNames:
+    # Must match the cluster name used in the helm chart install
     - "${WORKLOAD_CLUSTER_1}"
   usages:
     - server auth
@@ -661,8 +662,6 @@ glooAgent:
     repository: gloo-mesh-agent
   # A list of image pull secrets in the same namespace that store the credentials that are used to access a private container imagregistry. The image registry stores the container image that you want to use for this component.
   #imagePullSecrets: []
-  # enable verbose logging for the agent
-  verbose: true
 telemetryCollector:
   enabled: true
   config:
