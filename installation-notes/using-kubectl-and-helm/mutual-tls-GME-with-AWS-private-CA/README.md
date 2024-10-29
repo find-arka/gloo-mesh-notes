@@ -1,9 +1,52 @@
-# mTLS relay setup with bring your own CA and TLS certs
+<!-- TOC start -->
 
-[Setup summary](https://docs.solo.io/gloo-mesh-enterprise/latest/setup/prod/certs/relay/setup-options/#manual-certs)
+- [mTLS relay setup with bring your own CA](#mtls-relay-setup-with-bring-your-own-ca)
+  - [Cluster setup](#cluster-setup)
+    - [Setup env variables](#setup-env-variables)
+    - [Create clusters](#create-clusters)
+  - [Install cert manager](#install-cert-manager)
+  - [Create Root CA for Gloo Mesh in AWS Private CA](#create-root-ca-for-gloo-mesh-in-aws-private-ca)
+  - [Setup IAM Role Based Service Account (IRSA) for AWS PCA Issuer plugin](#setup-iam-role-based-service-account-irsa-for-aws-pca-issuer-plugin)
+    - [IAM Policy creation](#iam-policy-creation)
+    - [Create IAM Roles bound to service account IRSA](#create-iam-roles-bound-to-service-account-irsa)
+  - [Install aws-privateca-issuer plugin using the ServiceAccount aws-pca-issuer](#install-aws-privateca-issuer-plugin-using-the-serviceaccount-aws-pca-issuer)
+  - [Create Certificate Kubernetes Secrets](#create-certificate-kubernetes-secrets)
+    - [Create Issuer objects](#create-issuer-objects)
+    - [Create Certificate objects](#create-certificate-objects)
+      - [Management server certificate](#management-server-certificate)
+        - [Validation mgmt cert](#validation-mgmt-cert)
+      - [Telemetry Gateway certificate](#telemetry-gateway-certificate)
+        - [Validation telemetry gateway cert](#validation-telemetry-gateway-cert)
+      - [Create Gloo Agent Certificate in workload cluster](#create-gloo-agent-certificate-in-workload-cluster)
+        - [Validation agent cert](#validation-agent-cert)
+  - [Install Gloo Mesh mgmt server components with custom CA certificate secrets](#install-gloo-mesh-mgmt-server-components-with-custom-ca-certificate-secrets)
+    - [pre-req Create enterprise license Secret in mgmt cluster](#pre-req-create-enterprise-license-secret-in-mgmt-cluster)
+    - [Install CRDs](#install-crds)
+    - [Install Gloo Mesh mgmt server controlplane components](#install-gloo-mesh-mgmt-server-controlplane-components)
+  - [Install Gloo Mesh agent](#install-gloo-mesh-agent)
+    - [Register agent using KubernetesCluster object in mgmt cluster](#register-agent-using-kubernetescluster-object-in-mgmt-cluster)
+    - [Install CRDs in workload cluster](#install-crds-in-workload-cluster)
+    - [Get LB Addresses of mgmt server and Telemetry Gateway](#get-lb-addresses-of-mgmt-server-and-telemetry-gateway)
+    - [Create Root cert secret](#create-root-cert-secret)
+    - [Install Gloo Mesh agent and telemetry components in workload cluster](#install-gloo-mesh-agent-and-telemetry-components-in-workload-cluster)
+    - [validate using meshctl CLI](#validate-using-meshctl-cli)
 
+<!-- TOC end -->
+
+<!-- TOC --><a name="mtls-relay-setup-with-bring-your-own-ca"></a>
+
+# mTLS relay setup with bring your own CA
+
+One of the options of setting up mTLS agent-server relay communication is to store the CA signing certificate and key with your own PKI provider. You then have the option to generate the gloo mgmt server and gloo agent TLS certificates and store them in a Kubernetes secret. To automate the process you may use a tool, such as cert-manager, to automatically issue and rotate TLS certificates for you.
+
+When the Gloo agent tries to connect to the Gloo management server for the first time, the agent presents the client TLS certificate to prove its identity. Because a client TLS certificate is present during the initial connection between the Gloo management server and the agent, no relay identity tokens are required in this setup.
+
+In the following example we use AWS Private CA to setup the external PKI and then use cert manager to manage the certificate lifecycle.
+
+<!-- TOC --><a name="cluster-setup"></a>
 ## Cluster setup
 
+<!-- TOC --><a name="setup-env-variables"></a>
 ### Setup env variables
 
 ```bash
@@ -15,6 +58,7 @@ MGMT_CLUSTER=gloo-mesh-mgmt-cluster
 MGMT_CLUSTER_REGION=us-west-2
 ```
 
+<!-- TOC --><a name="create-clusters"></a>
 ### Create clusters
 
 ```bash
@@ -53,6 +97,7 @@ kubectl config rename-context \
  "${WORKLOAD_CLUSTER_1}"
 ```
 
+<!-- TOC --><a name="install-cert-manager"></a>
 ## Install cert manager
 
 ```bash
@@ -73,6 +118,7 @@ kubectl -n cert-manager rollout status deploy/cert-manager-cainjector;
 kubectl -n cert-manager rollout status deploy/cert-manager-webhook;
 ```
 
+<!-- TOC --><a name="create-root-ca-for-gloo-mesh-in-aws-private-ca"></a>
 ## Create Root CA for Gloo Mesh in AWS Private CA
 
 ```bash
@@ -172,8 +218,10 @@ echo "ARN of Root CA is ${ROOT_CAARN}"
 echo "-----------------------------------------------------------"
 ```
 
+<!-- TOC --><a name="setup-iam-role-based-service-account-irsa-for-aws-pca-issuer-plugin"></a>
 ## Setup IAM Role Based Service Account (IRSA) for AWS PCA Issuer plugin
 
+<!-- TOC --><a name="iam-policy-creation"></a>
 ### IAM Policy creation
 
 ```bash
@@ -206,6 +254,7 @@ POLICY_ARN=$(aws iam create-policy \
 echo "IAM POLICY_ARN = ${POLICY_ARN}"
 ```
 
+<!-- TOC --><a name="create-iam-roles-bound-to-service-account-irsa"></a>
 ### Create IAM Roles bound to service account IRSA
 
 ```bash
@@ -247,6 +296,7 @@ eksctl create iamserviceaccount --cluster=${CURRENT_CLUSTER} --region ${WORKLOAD
     --approve;
 ```
 
+<!-- TOC --><a name="install-aws-privateca-issuer-plugin-using-the-serviceaccount-aws-pca-issuer"></a>
 ## Install aws-privateca-issuer plugin using the ServiceAccount aws-pca-issuer
 
 ```bash
@@ -273,8 +323,10 @@ kubectl -n ${PCA_NAMESPACE} \
 
 > Need to install on all clusters
 
+<!-- TOC --><a name="create-certificate-kubernetes-secrets"></a>
 ## Create Certificate Kubernetes Secrets
 
+<!-- TOC --><a name="create-issuer-objects"></a>
 ### Create Issuer objects
 
 ```bash
@@ -297,8 +349,10 @@ EOF
 done
 ```
 
+<!-- TOC --><a name="create-certificate-objects"></a>
 ### Create Certificate objects
 
+<!-- TOC --><a name="management-server-certificate"></a>
 #### Management server certificate
 
 ```bash
@@ -335,6 +389,7 @@ spec:
 EOF
 ```
 
+<!-- TOC --><a name="validation-mgmt-cert"></a>
 ##### Validation mgmt cert
 
 ```bash
@@ -346,6 +401,7 @@ NAME                             READY   SECRET                             ISSU
 gloo-mesh-mgmt-server-tls-cert   True    gloo-mesh-mgmt-server-tls-secret   aws-pca-issuer-gloo-mesh   Certificate is up to date and has not expired   4s
 ```
 
+<!-- TOC --><a name="telemetry-gateway-certificate"></a>
 #### Telemetry Gateway certificate
 
 ```bash
@@ -382,6 +438,7 @@ spec:
 EOF
 ```
 
+<!-- TOC --><a name="validation-telemetry-gateway-cert"></a>
 ##### Validation telemetry gateway cert
 
 ```bash
@@ -393,6 +450,7 @@ NAME                                   READY   SECRET                           
 gloo-mesh-telemetry-gateway-tls-cert   True    gloo-telemetry-gateway-tls-secret   aws-pca-issuer-gloo-mesh   Certificate is up to date and has not expired   6s
 ```
 
+<!-- TOC --><a name="create-gloo-agent-certificate-in-workload-cluster"></a>
 #### Create Gloo Agent Certificate in workload cluster
 
 ```bash
@@ -430,6 +488,7 @@ spec:
 EOF
 ```
 
+<!-- TOC --><a name="validation-agent-cert"></a>
 ##### Validation agent cert
 
 ```bash
@@ -441,6 +500,7 @@ NAME                       READY   SECRET                       ISSUER          
 gloo-mesh-agent-tls-cert   True    gloo-mesh-agent-tls-secret   aws-pca-issuer-gloo-mesh   Certificate is up to date and has not expired   4s
 ```
 
+<!-- TOC --><a name="install-gloo-mesh-mgmt-server-components-with-custom-ca-certificate-secrets"></a>
 ## Install Gloo Mesh mgmt server components with custom CA certificate secrets
 
 set env var
@@ -449,6 +509,7 @@ set env var
 export GLOO_MESH_ENTERPRISE_VERSION=2.6.5
 ```
 
+<!-- TOC --><a name="pre-req-create-enterprise-license-secret-in-mgmt-cluster"></a>
 ### pre-req Create enterprise license Secret in mgmt cluster
 
 ```bash
@@ -465,6 +526,7 @@ stringData:
 EOF
 ```
 
+<!-- TOC --><a name="install-crds"></a>
 ### Install CRDs
 
 ```bash
@@ -474,6 +536,7 @@ helm upgrade -i gloo-platform-crds gloo-platform/gloo-platform-crds \
   --namespace=gloo-mesh --wait
 ```
 
+<!-- TOC --><a name="install-gloo-mesh-mgmt-server-controlplane-components"></a>
 ### Install Gloo Mesh mgmt server controlplane components
 
 ```bash
@@ -586,8 +649,10 @@ telemetryCollectorCustomization:
 EOF
 ```
 
+<!-- TOC --><a name="install-gloo-mesh-agent"></a>
 ## Install Gloo Mesh agent
 
+<!-- TOC --><a name="register-agent-using-kubernetescluster-object-in-mgmt-cluster"></a>
 ### Register agent using KubernetesCluster object in mgmt cluster
 
 ```bash
@@ -602,6 +667,7 @@ spec:
 EOF
 ```
 
+<!-- TOC --><a name="install-crds-in-workload-cluster"></a>
 ### Install CRDs in workload cluster
 
 ```bash
@@ -611,6 +677,7 @@ helm upgrade -i gloo-platform-crds gloo-platform/gloo-platform-crds \
   --namespace=gloo-mesh --wait
 ```
 
+<!-- TOC --><a name="get-lb-addresses-of-mgmt-server-and-telemetry-gateway"></a>
 ### Get LB Addresses of mgmt server and Telemetry Gateway
 
 ```bash
@@ -628,6 +695,7 @@ echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
 echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
 ```
 
+<!-- TOC --><a name="create-root-cert-secret"></a>
 ### Create Root cert secret
 
 ```bash
@@ -636,6 +704,7 @@ echo "${RELAY_ROOT_TLS_SECRET_CA_CERT}"
 kubectl --context ${WORKLOAD_CLUSTER_1} -n gloo-mesh create secret generic relay-root-tls-secret --from-literal="ca.crt"="${RELAY_ROOT_TLS_SECRET_CA_CERT}"
 ```
 
+<!-- TOC --><a name="install-gloo-mesh-agent-and-telemetry-components-in-workload-cluster"></a>
 ### Install Gloo Mesh agent and telemetry components in workload cluster
 
 ```bash
@@ -679,6 +748,7 @@ telemetryCollectorCustomization:
 EOF
 ```
 
+<!-- TOC --><a name="validate-using-meshctl-cli"></a>
 ### validate using meshctl CLI
 
 ```bash
