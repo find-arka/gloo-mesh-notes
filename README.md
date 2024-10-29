@@ -1,6 +1,6 @@
 # Gloo Mesh Enterprise Notes
 
-## Installation and realted guides
+## Installation and related guides
 
 ### Using Helm
 
