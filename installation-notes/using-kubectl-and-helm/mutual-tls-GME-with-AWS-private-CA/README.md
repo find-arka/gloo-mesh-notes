@@ -267,7 +267,7 @@ eksctl create iamserviceaccount --cluster=${CURRENT_CLUSTER} --region ${MGMT_CLU
     --role-name "ServiceAccountRolePrivateCA-${CURRENT_CLUSTER}" \
     --namespace=cert-manager \
     --override-existing-serviceaccounts \
-    --name="aws-pca-issuer"
+    --name="aws-pca-issuer" \
     --approve;
 ```
 
@@ -475,6 +475,38 @@ spec:
     - client auth
     - digital signature
     - key encipherment
+  privateKey:
+    algorithm: "RSA"
+    size: 2048
+# ---------------- Certificate details ---------------------------------
+EOF
+```
+
+Create the `relay-root-tls-secret` (required by the collector) for cross cluster OTel collector-gateway communications.
+
+```bash
+kubectl apply --context ${WORKLOAD_CLUSTER_1} -f - << EOF
+kind: Certificate
+apiVersion: cert-manager.io/v1
+metadata:
+  name: gloo-mesh-collector-tls-cert
+  namespace: gloo-mesh
+spec:
+  issuerRef:
+# ---------------- Issuer for Gloo Mesh certs ---------------------------
+    group: awspca.cert-manager.io
+    kind: AWSPCAIssuer
+    name: aws-pca-issuer-gloo-mesh
+# ---------------- Issuer for Gloo Mesh certs ---------------------------
+# ---------------- K8s secret that will be created ---------------------
+  secretName: relay-root-tls-secret
+# ---------------- Certificate details ---------------------------------
+  duration: 8760h # 365 days
+  renewBefore: 360h # 15 days
+  commonName: gloo-mesh-telemetry-collector
+  usages:
+    - server auth
+    - client auth
   privateKey:
     algorithm: "RSA"
     size: 2048
