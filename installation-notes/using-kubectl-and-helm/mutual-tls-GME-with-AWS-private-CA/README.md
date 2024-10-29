@@ -50,21 +50,16 @@ In the following example we use AWS Private CA to setup the external PKI and the
 ### Setup env variables
 
 ```bash
-MGMT=gloo-mesh-mgmt-cluster
-CLUSTER_1=gloo-mesh-workload-cluster-1
-WORKLOAD_CLUSTER_1=gloo-mesh-workload-cluster-1
-WORKLOAD_CLUSTER_1_REGION=us-west-1
 MGMT_CLUSTER=gloo-mesh-mgmt-cluster
 MGMT_CLUSTER_REGION=us-west-2
+WORKLOAD_CLUSTER_1=gloo-mesh-workload-cluster-1
+WORKLOAD_CLUSTER_1_REGION=us-west-1
 ```
 
 <!-- TOC --><a name="create-clusters"></a>
 ### Create clusters
 
 ```bash
-MGMT_CLUSTER=gloo-mesh-mgmt-cluster
-MGMT_CLUSTER_REGION=us-west-2
-
 eksctl create cluster --name $MGMT_CLUSTER --region $MGMT_CLUSTER_REGION \
   --spot \
   --version=1.30 \
@@ -80,9 +75,6 @@ kubectl config rename-context \
 ```
 
 ```bash
-WORKLOAD_CLUSTER_1=gloo-mesh-workload-cluster-1
-WORKLOAD_CLUSTER_1_REGION=us-west-1
-
 eksctl create cluster --name $WORKLOAD_CLUSTER_1 --region $WORKLOAD_CLUSTER_1_REGION \
   --spot \
   --version=1.30 \
@@ -226,7 +218,7 @@ echo "-----------------------------------------------------------"
 
 ```bash
 echo "ROOT_CAARN = ${ROOT_CAARN}"
-cat <<EOF > AWSPCAIssuerPolicy-${USER}.json
+cat <<EOF > AWSPCAIssuerPolicy.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -247,8 +239,8 @@ cat <<EOF > AWSPCAIssuerPolicy-${USER}.json
 EOF
 
 POLICY_ARN=$(aws iam create-policy \
-    --policy-name AWSPCAIssuerPolicy-${USER} \
-    --policy-document file://AWSPCAIssuerPolicy-${USER}.json \
+    --policy-name AWSPCAIssuerPolicy \
+    --policy-document file://AWSPCAIssuerPolicy.json \
     --output json | jq -r '.Policy.Arn')
 
 echo "IAM POLICY_ARN = ${POLICY_ARN}"
@@ -682,13 +674,13 @@ helm upgrade -i gloo-platform-crds gloo-platform/gloo-platform-crds \
 
 ```bash
 # wait for the load balancer to be provisioned
-until kubectl get service/gloo-mesh-mgmt-server --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
-until kubectl get service/gloo-telemetry-gateway --output=jsonpath='{.status.loadBalancer}' --context ${MGMT} -n gloo-mesh | grep "ingress"; do : ; done
+until kubectl get service/gloo-mesh-mgmt-server --output=jsonpath='{.status.loadBalancer}' --context ${MGMT_CLUSTER} -n gloo-mesh | grep "ingress"; do : ; done
+until kubectl get service/gloo-telemetry-gateway --output=jsonpath='{.status.loadBalancer}' --context ${MGMT_CLUSTER} -n gloo-mesh | grep "ingress"; do : ; done
 
 # Get the LB addresses
-export GLOO_PLATFORM_SERVER_DOMAIN=$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}')
-export GLOO_PLATFORM_SERVER_ADDRESS=${GLOO_PLATFORM_SERVER_DOMAIN}:$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="grpc")].port}')
-export GLOO_TELEMETRY_GATEWAY=$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}'):$(kubectl get svc gloo-telemetry-gateway --context ${MGMT} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="otlp")].port}')
+export GLOO_PLATFORM_SERVER_DOMAIN=$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT_CLUSTER} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}')
+export GLOO_PLATFORM_SERVER_ADDRESS=${GLOO_PLATFORM_SERVER_DOMAIN}:$(kubectl get svc gloo-mesh-mgmt-server --context ${MGMT_CLUSTER} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="grpc")].port}')
+export GLOO_TELEMETRY_GATEWAY=$(kubectl get svc gloo-telemetry-gateway --context ${MGMT_CLUSTER} -n gloo-mesh -o jsonpath='{.status.loadBalancer.ingress[0].*}'):$(kubectl get svc gloo-telemetry-gateway --context ${MGMT_CLUSTER} -n gloo-mesh -o jsonpath='{.spec.ports[?(@.name=="otlp")].port}')
 
 # Print the values
 echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
