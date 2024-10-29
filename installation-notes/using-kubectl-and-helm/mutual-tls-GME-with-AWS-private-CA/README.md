@@ -110,6 +110,8 @@ kubectl -n cert-manager rollout status deploy/cert-manager-cainjector;
 kubectl -n cert-manager rollout status deploy/cert-manager-webhook;
 ```
 
+> We would need to install on both the clusters
+
 <!-- TOC --><a name="create-root-ca-for-gloo-mesh-in-aws-private-ca"></a>
 ## Create Root CA for Gloo Mesh in AWS Private CA
 
@@ -313,7 +315,7 @@ kubectl -n ${PCA_NAMESPACE} \
     rollout status deploy/aws-pca-issuer-aws-privateca-issuer;
 ```
 
-> Need to install on all clusters
+> We would need to install on both the clusters
 
 <!-- TOC --><a name="create-certificate-kubernetes-secrets"></a>
 ## Create Certificate Kubernetes Secrets
