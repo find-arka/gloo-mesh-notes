@@ -27,7 +27,6 @@
     - [Register agent using KubernetesCluster object in mgmt cluster](#register-agent-using-kubernetescluster-object-in-mgmt-cluster)
     - [Install CRDs in workload cluster](#install-crds-in-workload-cluster)
     - [Get LB Addresses of mgmt server and Telemetry Gateway](#get-lb-addresses-of-mgmt-server-and-telemetry-gateway)
-    - [Create Root cert secret](#create-root-cert-secret)
     - [Install Gloo Mesh agent and telemetry components in workload cluster](#install-gloo-mesh-agent-and-telemetry-components-in-workload-cluster)
     - [validate using meshctl CLI](#validate-using-meshctl-cli)
 
@@ -719,15 +718,6 @@ export GLOO_TELEMETRY_GATEWAY=$(kubectl get svc gloo-telemetry-gateway --context
 # Print the values
 echo "Mgmt Plane Address: $GLOO_PLATFORM_SERVER_ADDRESS"
 echo "Metrics Gateway Address: $GLOO_TELEMETRY_GATEWAY"
-```
-
-<!-- TOC --><a name="create-root-cert-secret"></a>
-### Create Root cert secret
-
-```bash
-RELAY_ROOT_TLS_SECRET_CA_CERT=$(kubectl --context ${WORKLOAD_CLUSTER_1} -n gloo-mesh get secret gloo-mesh-agent-tls-secret -o yaml | yq '.data."ca.crt"' | base64 -d)
-echo "${RELAY_ROOT_TLS_SECRET_CA_CERT}"
-kubectl --context ${WORKLOAD_CLUSTER_1} -n gloo-mesh create secret generic relay-root-tls-secret --from-literal="ca.crt"="${RELAY_ROOT_TLS_SECRET_CA_CERT}"
 ```
 
 <!-- TOC --><a name="install-gloo-mesh-agent-and-telemetry-components-in-workload-cluster"></a>
