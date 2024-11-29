@@ -17,8 +17,9 @@
     - [Add explicit allow rule for ingress to server-v1 traffic](#add-explicit-allow-rule-for-ingress-to-server-v1-traffic)
     - [Routing config - create VirtualGateway](#routing-config---create-virtualgateway)
     - [Routing config - create RouteTable](#routing-config---create-routetable)
-    - [port-forward the Ingress gateway](#port-forward-the-ingress-gateway)
     - [test using grpcurl](#test-using-grpcurl)
+      - [port-forward the Ingress gateway](#port-forward-the-ingress-gateway)
+      - [grpcurl through the localhost with explicit authority for hostname mapping](#grpcurl-through-the-localhost-with-explicit-authority-for-hostname-mapping)
       - [Current state](#current-state)
 
 # Zero trust setup notes
@@ -471,13 +472,15 @@ spec:
 EOF
 ```
 
-### port-forward the Ingress gateway
+### test using grpcurl
+
+#### port-forward the Ingress gateway
 
 ```bash
 kubectl --context k3d-workload-cluster1 -n istio-gateways port-forward deploy/istio-ingressgateway-1-23 8080
 ```
 
-### test using grpcurl
+#### grpcurl through the localhost with explicit authority for hostname mapping
 
 ```bash
 grpcurl -authority echo-server-v1.consultsolo.net -plaintext localhost:8080 proto.EchoTestService/Echo | jq -r '.message'
