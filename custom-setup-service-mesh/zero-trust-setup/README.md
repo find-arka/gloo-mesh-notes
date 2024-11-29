@@ -19,6 +19,7 @@
     - [Routing config - create RouteTable](#routing-config---create-routetable)
     - [port-forward the Ingress gateway](#port-forward-the-ingress-gateway)
     - [test using grpcurl](#test-using-grpcurl)
+      - [Current state](#current-state)
 
 # Zero trust setup notes
 
@@ -481,3 +482,98 @@ kubectl --context k3d-workload-cluster1 -n istio-gateways port-forward deploy/is
 ```bash
 grpcurl -authority echo-server-v1.consultsolo.net -plaintext localhost:8080 proto.EchoTestService/Echo | jq -r '.message'
 ```
+
+#### Current state
+
+Error message:
+
+```bash
+Error invoking method "proto.EchoTestService/Echo": rpc error: code = PermissionDenied desc = failed to query for service descriptor "proto.EchoTestService": RBAC: access denied
+```
+
+Access log from ingress gateway
+
+```json
+{
+  "authority": "echo-server-v1.consultsolo.net",
+  "bytes_received": 0,
+  "bytes_sent": 0,
+  "connection_termination_details": null,
+  "downstream_local_address": "127.0.0.1:8080",
+  "downstream_remote_address": "127.0.0.1:50570",
+  "duration": 0,
+  "method": "POST",
+  "path": "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+  "protocol": "HTTP/2",
+  "request_id": "66f61b94-e66c-415f-aafe-55fb9a2aaa1c",
+  "requested_server_name": null,
+  "response_code": 200,
+  "response_code_details": "rbac_access_denied_matched_policy[none]",
+  "response_flags": "-",
+  "route_name": "insecure-ingress-to-echo-server-269c4eb90b79a85fa2119a873455d89",
+  "start_time": "2024-11-29T22:47:16.307Z",
+  "upstream_cluster": "outbound|9080||echo-server-v1.server-app-namespace.svc.cluster.local;",
+  "upstream_host": null,
+  "upstream_local_address": null,
+  "upstream_service_time": null,
+  "upstream_transport_failure_reason": null,
+  "user_agent": "grpcurl/1.9.1 grpc-go/1.61.0",
+  "x_forwarded_for": "10.42.0.19"
+}
+{
+  "authority": "echo-server-v1.consultsolo.net",
+  "bytes_received": 0,
+  "bytes_sent": 0,
+  "connection_termination_details": null,
+  "downstream_local_address": "127.0.0.1:8080",
+  "downstream_remote_address": "127.0.0.1:50570",
+  "duration": 0,
+  "method": "POST",
+  "path": "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+  "protocol": "HTTP/2",
+  "request_id": "42d13121-6cc0-44bf-9e05-ef0d9ffbeb12",
+  "requested_server_name": null,
+  "response_code": 200,
+  "response_code_details": "rbac_access_denied_matched_policy[none]",
+  "response_flags": "-",
+  "route_name": "insecure-ingress-to-echo-server-269c4eb90b79a85fa2119a873455d89",
+  "start_time": "2024-11-29T22:47:16.308Z",
+  "upstream_cluster": "outbound|9080||echo-server-v1.server-app-namespace.svc.cluster.local;",
+  "upstream_host": null,
+  "upstream_local_address": null,
+  "upstream_service_time": null,
+  "upstream_transport_failure_reason": null,
+  "user_agent": "grpcurl/1.9.1 grpc-go/1.61.0",
+  "x_forwarded_for": "10.42.0.19"
+}
+{
+  "authority": "echo-server-v1.consultsolo.net",
+  "bytes_received": 0,
+  "bytes_sent": 0,
+  "connection_termination_details": null,
+  "downstream_local_address": "127.0.0.1:8080",
+  "downstream_remote_address": "127.0.0.1:50570",
+  "duration": 0,
+  "method": "POST",
+  "path": "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+  "protocol": "HTTP/2",
+  "request_id": "71d0353f-f159-406f-b3f3-eaa561c987bd",
+  "requested_server_name": null,
+  "response_code": 200,
+  "response_code_details": "rbac_access_denied_matched_policy[none]",
+  "response_flags": "-",
+  "route_name": "insecure-ingress-to-echo-server-269c4eb90b79a85fa2119a873455d89",
+  "start_time": "2024-11-29T22:47:16.308Z",
+  "upstream_cluster": "outbound|9080||echo-server-v1.server-app-namespace.svc.cluster.local;",
+  "upstream_host": null,
+  "upstream_local_address": null,
+  "upstream_service_time": null,
+  "upstream_transport_failure_reason": null,
+  "user_agent": "grpcurl/1.9.1 grpc-go/1.61.0",
+  "x_forwarded_for": "10.42.0.19"
+}
+```
+
+GME Gateway view
+
+![gme-gateway](./assets/gme-gateway.png)
