@@ -1,10 +1,13 @@
 - [Zero trust setup notes](#zero-trust-setup-notes)
   - [Environment setup with k3d and docker](#environment-setup-with-k3d-and-docker)
   - [Setup mTLS and Zero trust by default](#setup-mtls-and-zero-trust-by-default)
-    - [mTLS](#mtls)
-    - [Default deny](#default-deny)
-    - [Test that nothing works at this moment](#test-that-nothing-works-at-this-moment)
+    - [Test that all cases work at the moment](#test-that-all-cases-work-at-the-moment)
+    - [Setup strict mTLS](#setup-strict-mtls)
+    - [Setup default deny security posture](#setup-default-deny-security-posture)
+    - [Test that all the access are denied](#test-that-all-the-access-are-denied)
   - [Setup Zero visibility for sidecars](#setup-zero-visibility-for-sidecars)
+    - [list of endpoints visible before making the change](#list-of-endpoints-visible-before-making-the-change)
+    - [Trim proxy visibility](#trim-proxy-visibility)
     - [Validate that sample app is not aware of other endpoints](#validate-that-sample-app-is-not-aware-of-other-endpoints)
   - [Selectively allow traffic from one in-mesh app to another in-mesh app](#selectively-allow-traffic-from-one-in-mesh-app-to-another-in-mesh-app)
     - [Set visibility](#set-visibility)
@@ -14,13 +17,14 @@
     - [Create gateways-workspace](#create-gateways-workspace)
     - [import from server-workspace](#import-from-server-workspace)
     - [export to gateways-workspace](#export-to-gateways-workspace)
-    - [Add explicit allow rule for ingress to server-v1 traffic](#add-explicit-allow-rule-for-ingress-to-server-v1-traffic)
+    - [Add explicit allow rule for ingress to echo-server-v1 traffic](#add-explicit-allow-rule-for-ingress-to-echo-server-v1-traffic)
+    - [Add explicit allow rule for ingress to echo-server-v2 traffic](#add-explicit-allow-rule-for-ingress-to-echo-server-v2-traffic)
     - [Routing config - create VirtualGateway](#routing-config---create-virtualgateway)
     - [Routing config - create RouteTable](#routing-config---create-routetable)
-    - [test using grpcurl](#test-using-grpcurl)
+    - [Define traffic that is allowed through the Ingress Gateway](#define-traffic-that-is-allowed-through-the-ingress-gateway)
+    - [Test using grpcurl](#test-using-grpcurl)
       - [port-forward the Ingress gateway](#port-forward-the-ingress-gateway)
       - [grpcurl through the localhost with explicit authority for hostname mapping](#grpcurl-through-the-localhost-with-explicit-authority-for-hostname-mapping)
-      - [Current state](#current-state)
 
 # Zero trust setup notes
 
@@ -42,7 +46,32 @@ The script takes about 5 minutes and does the following:
 
 ## Setup mTLS and Zero trust by default
 
-### mTLS
+### Test that all cases work at the moment
+
+Expectation: #1, #2, #3 should all succeed
+
+```bash
+#1 Test access from app outside mesh (i.e. no sidecar) to app inside the mesh (has a sidecar)
+kubectl --context k3d-workload-cluster1 -n default \
+  exec -it deploy/netshoot-outside-mesh -c netshoot-outside-mesh \
+  -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
+```
+
+```bash
+#2 Test access from app inside mesh but from different Namespace
+kubectl --context k3d-workload-cluster1 -n client-app-namespace \
+  exec -it deploy/netshoot-client-app-namespace -c netshoot-client-app-namespace \
+  -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
+```
+
+```bash
+#3 Test access from app inside mesh and from the same Namespace
+kubectl --context k3d-workload-cluster1 -n server-app-namespace \
+  exec -it deploy/netshoot-server-app-namespace -c netshoot-server-app-namespace \
+  -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
+```
+
+### Setup strict mTLS
 
 ```bash
 #PeerAuthentication:  To setup STRICT mTLS everywhere posture
@@ -62,7 +91,7 @@ EOF
 done
 ```
 
-### Default deny
+### Setup default deny security posture
 
 ```bash
 #AuthorizationPolicy: To setup deny all traffic by default - zero trust security posture
@@ -81,7 +110,7 @@ EOF
 done
 ```
 
-### Test that nothing works at this moment
+### Test that all the access are denied
 
 Expectation: #1, #2, #3 should all fail due to default deny posture
 
@@ -90,12 +119,16 @@ Expectation: #1, #2, #3 should all fail due to default deny posture
 kubectl --context k3d-workload-cluster1 -n default \
   exec -it deploy/netshoot-outside-mesh -c netshoot-outside-mesh \
   -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
+```
 
+```bash
 #2 Test access from app inside mesh but from different Namespace
 kubectl --context k3d-workload-cluster1 -n client-app-namespace \
   exec -it deploy/netshoot-client-app-namespace -c netshoot-client-app-namespace \
   -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
+```
 
+```bash
 #3 Test access from app inside mesh and from the same Namespace
 kubectl --context k3d-workload-cluster1 -n server-app-namespace \
   exec -it deploy/netshoot-server-app-namespace -c netshoot-server-app-namespace \
@@ -106,8 +139,22 @@ kubectl --context k3d-workload-cluster1 -n server-app-namespace \
 
 ## Setup Zero visibility for sidecars
 
+This potentially improves the CPU and Memory utilization of the istio-proxy sidecar container.
+
+### list of endpoints visible before making the change
+
 ```bash
-# Trim proxy visibility
+istioctl proxy-config endpoint \
+  --context k3d-workload-cluster1 -n client-app-namespace \
+  deploy/netshoot-client-app-namespace
+```
+
+### Trim proxy visibility
+
+Trim proxy visibility using `trimAllProxyConfig: true`
+
+```bash
+#Trim proxy visibility
 #WS, WSS
 REMOTE_CONTEXT1="k3d-workload-cluster1"
 REMOTE_CONTEXT2="k3d-workload-cluster2"
@@ -204,7 +251,7 @@ istioctl proxy-config endpoint \
   deploy/netshoot-client-app-namespace
 ```
 
-Output should only show these-
+Output should only show these:
 
 ```bash
 ENDPOINT                                                STATUS      OUTLIER CHECK     CLUSTER
@@ -214,7 +261,13 @@ unix://./etc/istio/proxy/XDS                            HEALTHY     OK          
 unix://./var/run/secrets/workload-spiffe-uds/socket     HEALTHY     OK                sds-grpc
 ```
 
-> *At this point we have default deny posture everywhere, with minimal visibility for sidecars and with STRICT mTLS requirement everywhere*
+At this point, we have:
+
+- Default Deny posture everywhere
+
+- Minimal visibility for sidecar containers
+
+- STRICT mTLS requirement everywhere
 
 ## Selectively allow traffic from one in-mesh app to another in-mesh app
 
@@ -383,7 +436,9 @@ spec:
 EOF
 ```
 
-### Add explicit allow rule for ingress to server-v1 traffic
+![workspace](./assets/workspaces.png)
+
+### Add explicit allow rule for ingress to echo-server-v1 traffic
 
 ```bash
 kubectl apply --context k3d-gloo-mgmt-cluster -f- <<EOF
@@ -402,12 +457,41 @@ spec:
   config:
     authn:
       tlsMode: STRICT
-    authz:
-      allowedClients:
+    authzList:
+    - allowedClients:
       - serviceAccountSelector:
           namespace: client-app-namespace
           name: netshoot-client-app-namespace
-# ---- Additional source workload which can access the echo-server-v1 ----
+# ---- So that Ingress can access the echo-server-v1 ----
+    - allowedClients:
+      - serviceAccountSelector:
+          namespace: istio-gateways
+          name: istio-ingressgateway-1-23-service-account
+EOF
+```
+
+### Add explicit allow rule for ingress to echo-server-v2 traffic
+
+```bash
+kubectl apply --context k3d-gloo-mgmt-cluster -f- <<EOF
+apiVersion: security.policy.gloo.solo.io/v2
+kind: AccessPolicy
+metadata:
+  name: echo-server-v2-app-access
+  namespace: server-app-namespace-config
+spec:
+  applyToWorkloads:
+  - selector:
+      labels:
+        app: echo-server-v2
+      namespace: server-app-namespace
+      workspace: server-app-workspace
+  config:
+    authn:
+      tlsMode: STRICT
+    authzList:
+# ---- So that Ingress can access the echo-server-v2 ----
+    - allowedClients:
       - serviceAccountSelector:
           namespace: istio-gateways
           name: istio-ingressgateway-1-23-service-account
@@ -417,7 +501,7 @@ EOF
 ### Routing config - create VirtualGateway
 
 ```bash
-kubectl --context ${MGMT_CONTEXT} apply -f - <<EOF
+kubectl --context k3d-gloo-mgmt-cluster apply -f - <<EOF
 apiVersion: networking.gloo.solo.io/v2
 kind: VirtualGateway
 metadata:
@@ -441,7 +525,7 @@ EOF
 Domain based routing: `echo-server-v1.consultsolo.net`
 
 ```bash
-kubectl --context ${MGMT_CONTEXT} apply -f - <<EOF
+kubectl --context k3d-gloo-mgmt-cluster apply -f - <<EOF
 apiVersion: networking.gloo.solo.io/v2
 kind: RouteTable
 metadata:
@@ -453,7 +537,7 @@ spec:
   virtualGateways:
     - name: north-south-gw-common
       namespace: gateways-config
-      cluster: ${MGMT_CONTEXT}
+      cluster: k3d-gloo-mgmt-cluster
   workloadSelectors: []
   http:
     - name: ingress-to-echo-server-v1-route
@@ -472,7 +556,59 @@ spec:
 EOF
 ```
 
-### test using grpcurl
+Domain based routing: `echo-server-v2.consultsolo.net`
+
+```bash
+kubectl --context k3d-gloo-mgmt-cluster apply -f - <<EOF
+apiVersion: networking.gloo.solo.io/v2
+kind: RouteTable
+metadata:
+  name: ingress-to-echo-server-v2-grpc
+  namespace: server-app-namespace-config
+spec:
+  hosts:
+    - 'echo-server-v2.consultsolo.net'
+  virtualGateways:
+    - name: north-south-gw-common
+      namespace: gateways-config
+      cluster: k3d-gloo-mgmt-cluster
+  workloadSelectors: []
+  http:
+    - name: ingress-to-echo-server-v2-route
+      matchers:
+      - uri:
+          prefix: /
+      forwardTo:
+        destinations:
+          - kind: SERVICE
+            ref:
+              name: echo-server-v2
+              namespace: server-app-namespace
+            port:
+              # --- gRPC port for the application ---
+              number: 9080
+EOF
+```
+
+### Define traffic that is allowed through the Ingress Gateway
+
+```bash
+kubectl --context k3d-workload-cluster1 apply -f - <<EOF
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: rule-for-ingress-traffic
+  namespace: istio-gateways
+spec:
+  rules:
+  - to:
+    - operation:
+        hosts:
+        - '*.consultsolo.net'
+EOF
+```
+
+### Test using grpcurl
 
 #### port-forward the Ingress gateway
 
@@ -486,97 +622,6 @@ kubectl --context k3d-workload-cluster1 -n istio-gateways port-forward deploy/is
 grpcurl -authority echo-server-v1.consultsolo.net -plaintext localhost:8080 proto.EchoTestService/Echo | jq -r '.message'
 ```
 
-#### Current state
-
-Error message:
-
 ```bash
-Error invoking method "proto.EchoTestService/Echo": rpc error: code = PermissionDenied desc = failed to query for service descriptor "proto.EchoTestService": RBAC: access denied
+grpcurl -authority echo-server-v2.consultsolo.net -plaintext localhost:8080 proto.EchoTestService/Echo | jq -r '.message'
 ```
-
-Access log from ingress gateway
-
-```json
-{
-  "authority": "echo-server-v1.consultsolo.net",
-  "bytes_received": 0,
-  "bytes_sent": 0,
-  "connection_termination_details": null,
-  "downstream_local_address": "127.0.0.1:8080",
-  "downstream_remote_address": "127.0.0.1:50570",
-  "duration": 0,
-  "method": "POST",
-  "path": "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
-  "protocol": "HTTP/2",
-  "request_id": "66f61b94-e66c-415f-aafe-55fb9a2aaa1c",
-  "requested_server_name": null,
-  "response_code": 200,
-  "response_code_details": "rbac_access_denied_matched_policy[none]",
-  "response_flags": "-",
-  "route_name": "insecure-ingress-to-echo-server-269c4eb90b79a85fa2119a873455d89",
-  "start_time": "2024-11-29T22:47:16.307Z",
-  "upstream_cluster": "outbound|9080||echo-server-v1.server-app-namespace.svc.cluster.local;",
-  "upstream_host": null,
-  "upstream_local_address": null,
-  "upstream_service_time": null,
-  "upstream_transport_failure_reason": null,
-  "user_agent": "grpcurl/1.9.1 grpc-go/1.61.0",
-  "x_forwarded_for": "10.42.0.19"
-}
-{
-  "authority": "echo-server-v1.consultsolo.net",
-  "bytes_received": 0,
-  "bytes_sent": 0,
-  "connection_termination_details": null,
-  "downstream_local_address": "127.0.0.1:8080",
-  "downstream_remote_address": "127.0.0.1:50570",
-  "duration": 0,
-  "method": "POST",
-  "path": "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
-  "protocol": "HTTP/2",
-  "request_id": "42d13121-6cc0-44bf-9e05-ef0d9ffbeb12",
-  "requested_server_name": null,
-  "response_code": 200,
-  "response_code_details": "rbac_access_denied_matched_policy[none]",
-  "response_flags": "-",
-  "route_name": "insecure-ingress-to-echo-server-269c4eb90b79a85fa2119a873455d89",
-  "start_time": "2024-11-29T22:47:16.308Z",
-  "upstream_cluster": "outbound|9080||echo-server-v1.server-app-namespace.svc.cluster.local;",
-  "upstream_host": null,
-  "upstream_local_address": null,
-  "upstream_service_time": null,
-  "upstream_transport_failure_reason": null,
-  "user_agent": "grpcurl/1.9.1 grpc-go/1.61.0",
-  "x_forwarded_for": "10.42.0.19"
-}
-{
-  "authority": "echo-server-v1.consultsolo.net",
-  "bytes_received": 0,
-  "bytes_sent": 0,
-  "connection_termination_details": null,
-  "downstream_local_address": "127.0.0.1:8080",
-  "downstream_remote_address": "127.0.0.1:50570",
-  "duration": 0,
-  "method": "POST",
-  "path": "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
-  "protocol": "HTTP/2",
-  "request_id": "71d0353f-f159-406f-b3f3-eaa561c987bd",
-  "requested_server_name": null,
-  "response_code": 200,
-  "response_code_details": "rbac_access_denied_matched_policy[none]",
-  "response_flags": "-",
-  "route_name": "insecure-ingress-to-echo-server-269c4eb90b79a85fa2119a873455d89",
-  "start_time": "2024-11-29T22:47:16.308Z",
-  "upstream_cluster": "outbound|9080||echo-server-v1.server-app-namespace.svc.cluster.local;",
-  "upstream_host": null,
-  "upstream_local_address": null,
-  "upstream_service_time": null,
-  "upstream_transport_failure_reason": null,
-  "user_agent": "grpcurl/1.9.1 grpc-go/1.61.0",
-  "x_forwarded_for": "10.42.0.19"
-}
-```
-
-GME Gateway view
-
-![gme-gateway](./assets/gme-gateway.png)
