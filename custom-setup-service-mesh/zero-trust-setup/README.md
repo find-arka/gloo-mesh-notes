@@ -625,3 +625,5 @@ grpcurl -authority echo-server-v1.consultsolo.net -plaintext localhost:8080 prot
 ```bash
 grpcurl -authority echo-server-v2.consultsolo.net -plaintext localhost:8080 proto.EchoTestService/Echo | jq -r '.message'
 ```
+
+![domain-based-routing-through-ingress](./assets/domain-based-routing-through-ingress.png)
