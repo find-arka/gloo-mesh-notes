@@ -1,7 +1,7 @@
 - [Zero trust setup notes](#zero-trust-setup-notes)
   - [Environment setup with k3d and docker](#environment-setup-with-k3d-and-docker)
   - [Setup mTLS and Zero trust](#setup-mtls-and-zero-trust)
-    - [Test that all cases work at the moment](#test-that-all-cases-work-at-the-moment)
+    - [Test that all cases work at the beginning](#test-that-all-cases-work-at-the-beginning)
     - [Setup strict mTLS](#setup-strict-mtls)
     - [Setup default deny security posture](#setup-default-deny-security-posture)
     - [Test that all the access are denied](#test-that-all-the-access-are-denied)
@@ -46,7 +46,9 @@ The script takes about 5 minutes and does the following:
 
 ## Setup mTLS and Zero trust
 
-### Test that all cases work at the moment
+### Test that all cases work at the beginning
+
+![initial-setup](./assets/apps-initial-state.png)
 
 Expectation: #1, #2, #3 should all succeed
 
@@ -70,8 +72,6 @@ kubectl --context k3d-workload-cluster1 -n server-app-namespace \
   exec -it deploy/netshoot-server-app-namespace -c netshoot-server-app-namespace \
   -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
 ```
-
-![initial-setup](./assets/apps-initial-state.png)
 
 ### Setup strict mTLS
 
