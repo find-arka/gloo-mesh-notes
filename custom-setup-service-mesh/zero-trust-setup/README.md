@@ -261,13 +261,11 @@ unix://./etc/istio/proxy/XDS                            HEALTHY     OK          
 unix://./var/run/secrets/workload-spiffe-uds/socket     HEALTHY     OK                sds-grpc
 ```
 
-At this point, we have:
-
-- Default Deny posture everywhere
-
-- Minimal visibility for sidecar containers
-
-- STRICT mTLS requirement everywhere
+> At this point, we have configured:
+>
+> 1. **STRICT mTLS requirement**
+> 2. **Default Deny posture**
+> 3. **Minimal visibility for sidecar containers**
 
 ## Selectively allow traffic from one in-mesh app to another in-mesh app
 
