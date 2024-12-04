@@ -151,7 +151,9 @@ istioctl proxy-config endpoint \
 
 ### Trim proxy visibility
 
-Trim proxy visibility using `trimAllProxyConfig: true`
+Trim proxy visibility using Gloo Mesh Workspaces. `trimAllProxyConfig: true` setting used.
+
+![ws-including-gateway](./assets/ws-client-server.png)
 
 ```bash
 #Trim proxy visibility
@@ -360,6 +362,8 @@ kubectl --context k3d-workload-cluster1 -n server-app-namespace \
 
 ### Create gateways-workspace
 
+![ws-including-gateway](./assets/ws-including-gateway.png)
+
 ```bash
 MGMT_CONTEXT=k3d-gloo-mgmt-cluster
 REMOTE_CONTEXT1="k3d-workload-cluster1"
@@ -433,8 +437,6 @@ spec:
       enabled: false
 EOF
 ```
-
-![workspace](./assets/workspaces.png)
 
 ### Add explicit allow rule for ingress to echo-server-v1 traffic
 
