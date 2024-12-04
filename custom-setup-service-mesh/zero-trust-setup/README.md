@@ -1,6 +1,6 @@
 - [Zero trust setup notes](#zero-trust-setup-notes)
   - [Environment setup with k3d and docker](#environment-setup-with-k3d-and-docker)
-  - [Setup mTLS and Zero trust by default](#setup-mtls-and-zero-trust-by-default)
+  - [Setup mTLS and Zero trust](#setup-mtls-and-zero-trust)
     - [Test that all cases work at the moment](#test-that-all-cases-work-at-the-moment)
     - [Setup strict mTLS](#setup-strict-mtls)
     - [Setup default deny security posture](#setup-default-deny-security-posture)
@@ -40,11 +40,11 @@ The script takes about 5 minutes and does the following:
 - Create a docker network, creates 3 k3d clusters
 - Installs Gloo Mesh mgmt server, Gloo Mesh agents
 - Installs Istio ingress gateway in cluster 1 , egress gateway in cluster 2
-- Installs some in-mesh apps (sidecar injected) and one outside mesh app (in default NS)-
+- Installs some in-mesh apps (sidecar injected) and one outside mesh app (in default NS)
 
-![initial-setup](./assets/apps-initial-state.png)
+![after-running-setup-script](./assets/after-running-setup-script.png)
 
-## Setup mTLS and Zero trust by default
+## Setup mTLS and Zero trust
 
 ### Test that all cases work at the moment
 
@@ -70,6 +70,8 @@ kubectl --context k3d-workload-cluster1 -n server-app-namespace \
   exec -it deploy/netshoot-server-app-namespace -c netshoot-server-app-namespace \
   -- curl "http://echo-server-v1.server-app-namespace.svc.cluster.local:8080"
 ```
+
+![initial-setup](./assets/apps-initial-state.png)
 
 ### Setup strict mTLS
 
